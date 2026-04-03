@@ -2,7 +2,7 @@ type User @table {
   uid: String!  # Maps to Firebase Auth UID
   name: String
   preferredLanguage: String
-  createdAt: Timestamp
+  createdAt: Timestamp @default(expr: "request.time")
 }
 
 type LegalAidCenter @table {
@@ -15,7 +15,7 @@ type LegalAidCenter @table {
   categories: [String]!  # Changed to Array (e.g., ["labor", "domestic"]) for NoSQL
   timings: String
   description: String
-  createdAt: Timestamp!
+  createdAt: Timestamp! @default(expr: "request.time")
 }
 
 type UserQuery @table {
@@ -26,7 +26,7 @@ type UserQuery @table {
   isUrgent: Boolean!     # Drives the 100/181 helpline trigger
   isAnonymous: Boolean!  # HUGE WOW FACTOR parameter for judges
   aiResponse: String
-  createdAt: Timestamp!
+  createdAt: Timestamp! @default(expr: "request.time")
 }
 
 type Appointment @table {
@@ -38,5 +38,5 @@ type Appointment @table {
   preferredDate: Date!
   preferredTime: String
   status: String!        # "pending", "confirmed", "completed"
-  createdAt: Timestamp!
+  createdAt: Timestamp! @default(expr: "request.time")
 }
