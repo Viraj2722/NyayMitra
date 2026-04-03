@@ -8,6 +8,23 @@ import datetime
 
 query_bp = Blueprint("query", __name__)
 
+@query_bp.route("/recent", methods=["GET"])
+def recent_queries():
+    try:
+        db = firestore.client()
+        docs = db.collection("queries").order_by("created_at", direction=firestore.Query.DESCENDING).limit(10).stream()
+
+        queries = []
+        for doc in docs:
+            data = doc.to_dict()
+            data["id"] = doc.id
+            queries.append(data)
+
+        return jsonify(queries)
+    except Exception as e:
+        print("Recent query load failed, returning empty list:", e)
+        return jsonify([]), 200
+
 @query_bp.route("/", methods=["POST"])
 def handle_query():
     data = request.json

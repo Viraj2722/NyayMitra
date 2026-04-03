@@ -1,24 +1,53 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { AlertCircle, FileText, MapPin, CheckCircle, Shield, Calendar, X } from "lucide-react";
 import { createAppointmentDataConnect } from "@/lib/dataConnect";
 import { useAuth } from "@/context/AuthContext";
 
-const dummyCenters = [
-  { id: 1, name: "DLSA Mumbai Suburbs", address: "Bandra Court, Mumbai", phone: "022-26401037", dist: "2.1 km", cat: "Labor" },
-  { id: 2, name: "Kamgar Hakka Samiti", address: "Dadar West, Mumbai", phone: "9820011223", dist: "4.5 km", cat: "Labor" },
-  { id: 3, name: "State Women's Commission", address: "Bandra East, Mumbai", phone: "022-26592707", dist: "3.2 km", cat: "Domestic Violence" },
-];
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+
+type Center = {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  categories?: string[];
+  distance?: number;
+  latitude?: number;
+  longitude?: number;
+};
 
 export default function ResultsPage() {
-  const [selectedCenter, setSelectedCenter] = useState<any>(null);
+  const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [centers, setCenters] = useState<Center[]>([]);
+  const [loadingCenters, setLoadingCenters] = useState(true);
   const { user } = useAuth();
   
   // High Urgency red banner indicator
   const urgency: string = "normal"; 
+
+  useEffect(() => {
+    const loadCenters = async () => {
+      try {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`);
+        if (!response.ok) {
+          throw new Error(`Failed to load centers: ${response.status}`);
+        }
+        const data = await response.json();
+        setCenters(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Error loading legal centers", error);
+        setCenters([]);
+      } finally {
+        setLoadingCenters(false);
+      }
+    };
+
+    loadCenters();
+  }, []);
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -138,11 +167,21 @@ export default function ResultsPage() {
             </div>
 
             <div className="space-y-3">
-              {dummyCenters.filter(c => c.cat === "Labor").map(center => (
+              {loadingCenters && (
+                <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-gray-500 shadow-sm">
+                  Loading legal centers from the database...
+                </div>
+              )}
+              {!loadingCenters && centers.length === 0 && (
+                <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-gray-500 shadow-sm">
+                  No legal centers found in the database.
+                </div>
+              )}
+              {centers.map((center) => (
                 <div key={center.id} className="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
                   <div>
                     <h4 className="font-bold text-gray-900">{center.name}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">{center.address} • {center.dist}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{center.address}{center.distance ? ` • ${center.distance} km` : ""}</p>
                     <p className="text-xs font-medium text-[var(--color-deep-blue)] mt-1">{center.phone}</p>
                   </div>
                   <button 

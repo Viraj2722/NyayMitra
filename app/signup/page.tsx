@@ -12,6 +12,7 @@ export default function SignupPage() {
   
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [mobile, setMobile] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -21,7 +22,7 @@ export default function SignupPage() {
     setError("");
     setIsLoading(true);
     try {
-      await registerWithEmail(email, password, name);
+      await registerWithEmail(email, password, name, mobile);
       router.push("/");
     } catch (err: any) {
       if (err.code === "auth/email-already-in-use") {
@@ -82,6 +83,17 @@ export default function SignupPage() {
               required
               className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-deep-blue)] dark:focus:ring-blue-500 transition-all text-sm text-zinc-900 dark:text-white"
               placeholder="you@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Mobile Number</label>
+            <input
+              type="tel"
+              value={mobile}
+              onChange={(e) => setMobile(e.target.value)}
+              required
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-[var(--color-deep-blue)] dark:focus:ring-blue-500 transition-all text-sm text-zinc-900 dark:text-white"
+              placeholder="98XXXXXXXX"
             />
           </div>
           <div>

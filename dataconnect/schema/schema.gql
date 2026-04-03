@@ -2,7 +2,7 @@ type User @table {
   uid: String!  # Maps to Firebase Auth UID
   name: String
   preferredLanguage: String
-  role: String
+  mobile: String
   createdAt: Timestamp @default(expr: "request.time")
 }
 

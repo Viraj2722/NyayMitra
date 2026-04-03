@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { syncUserToDataConnect } from "@/lib/dataConnect";
-import { User, getIdTokenResult, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from "firebase/auth";
+import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from "firebase/auth";
 
 const ADMIN_EMAIL = "admin@example.com";
 
@@ -54,22 +54,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           uid: currentUser.uid,
           name: currentUser.displayName || "Admin",
           preferredLanguage: "English",
-          role: "admin"
+          mobile: currentUser.phoneNumber || undefined
         });
         setLoading(false);
         return;
       }
 
-      try {
-        const tokenResult = await getIdTokenResult(currentUser, true);
-        const claims = tokenResult.claims as { admin?: boolean; role?: string };
-        setIsAdmin(claims.admin === true || claims.role === "admin");
-      } catch (error) {
-        console.error("Error reading Firebase custom claims", error);
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
-      }
+      setIsAdmin(false);
+      setLoading(false);
     });
 
     return () => {
@@ -84,12 +76,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const result = await signInWithPopup(auth, provider);
       // Data Connect Mapping
       if (result.user) {
+        const mobile = window.prompt("Enter your mobile number to save with your account") || "";
         await syncUserToDataConnect({
           uid: result.user.uid,
           name: result.user.displayName || "Unknown",
           preferredLanguage: "English",
-          role: "user"
+          mobile
         });
+        setUser(result.user);
+        setIsAdmin(result.user.email === ADMIN_EMAIL);
       }
     } catch (error) {
       console.error("Error signing in with Google", error);
@@ -98,7 +93,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signInWithEmail = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      setUser(result.user);
+      setIsAdmin(result.user.email === ADMIN_EMAIL);
     } catch (error) {
       console.error("Error signing in with Email", error);
       throw error;
@@ -123,7 +120,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           uid: result.user.uid,
           name: name,
           preferredLanguage: "English",
-          role: "user"
+          mobile: result.user.phoneNumber || undefined
         });
       }
     } catch (error) {

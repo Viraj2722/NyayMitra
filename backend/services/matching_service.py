@@ -34,14 +34,4 @@ def get_nearest_centers(user_lat, user_lng, category):
         return centers[:3]  # top 3 nearest
     except Exception as e:
         print("Firebase Error or Not Initialized:", e)
-        # Dummy fallback data so the demo and frontend don't break
-        return [
-            {
-                "id": "dummy-1",
-                "name": "DLSA Pimpri-Chinchwad (Fallback)",
-                "address": "Pimpri-Chinchwad Court",
-                "phone": "020-27123456",
-                "categories": ["labor", "domestic"],
-                "distance": 5.2
-            }
-        ]
+        return []

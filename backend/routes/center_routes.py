@@ -17,4 +17,5 @@ def get_centers():
 
         return jsonify(centers)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print("Center load failed, returning empty list:", e)
+        return jsonify([]), 200

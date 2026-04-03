@@ -22,7 +22,7 @@ export interface User {
   uid: string;
   name?: string;
   preferredLanguage?: string;
-  role?: string;
+  mobile?: string;
 }
 
 export interface AppointmentInput {
@@ -43,7 +43,7 @@ export const syncUserToDataConnect = async (user: User) => {
       uid: user.uid,
       name: user.name || "Anonymous",
       preferredLanguage: user.preferredLanguage || "en",
-      role: user.role || "user"
+      mobile: user.mobile || null
     });
     console.log("✅ Data Connect Success:", res);
   } catch (err) {

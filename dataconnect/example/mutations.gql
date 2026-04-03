@@ -1,9 +1,9 @@
-mutation CreateUser($uid: String!, $name: String, $preferredLanguage: String, $role: String) @auth(level: PUBLIC) {
+mutation CreateUser($uid: String!, $name: String, $preferredLanguage: String, $mobile: String) @auth(level: PUBLIC) {
   user_insert(data: {
     uid: $uid,
     name: $name,
     preferredLanguage: $preferredLanguage,
-    role: $role
+    mobile: $mobile
   })
 }
 
