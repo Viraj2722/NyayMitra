@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
-import { Lock, Plus, Activity, FileText, Database, LogOut } from "lucide-react";
+import { Lock, Plus, Activity, FileText, Database, LogOut, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function AdminPage() {
-  const { user, signInWithEmail, logout } = useAuth();
+  const { user, isAdmin, loading, signInWithEmail, logout } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +20,20 @@ export default function AdminPage() {
     }
   };
 
-  // Ensure only authenticated users can see the dashboard
+  if (loading) {
+    return (
+      <div className="flex-1 bg-zinc-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+            <Lock className="w-8 h-8 text-[var(--color-deep-blue)]" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Checking access</h2>
+          <p className="text-gray-500 text-sm">Verifying your Firebase admin claims.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex-1 bg-zinc-50 flex items-center justify-center p-4">
@@ -57,6 +70,23 @@ export default function AdminPage() {
     );
   }
 
+  if (!isAdmin) {
+    return (
+      <div className="flex-1 bg-zinc-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <ShieldAlert className="w-8 h-8 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access denied</h2>
+          <p className="text-gray-500 mb-6 text-sm">Your Firebase account is signed in, but it does not have the admin claim.</p>
+          <button onClick={logout} className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3 rounded-lg shadow-md transition-colors">
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 bg-zinc-50 p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -74,6 +104,10 @@ export default function AdminPage() {
                 <p className="text-sm font-semibold text-gray-900">All Systems Operational</p>
               </div>
             </div>
+            <button onClick={logout} className="bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100 flex items-center gap-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
           </div>
         </header>
 

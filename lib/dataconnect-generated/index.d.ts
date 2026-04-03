@@ -35,6 +35,7 @@ export interface CreateUserVariables {
   uid: string;
   name?: string | null;
   preferredLanguage?: string | null;
+  role?: string | null;
 }
 
 export interface LegalAidCenter_Key {

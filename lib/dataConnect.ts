@@ -22,6 +22,7 @@ export interface User {
   uid: string;
   name?: string;
   preferredLanguage?: string;
+  role?: string;
 }
 
 export interface AppointmentInput {
@@ -41,7 +42,8 @@ export const syncUserToDataConnect = async (user: User) => {
     const res = await createUser(dataConnect, {
       uid: user.uid,
       name: user.name || "Anonymous",
-      preferredLanguage: user.preferredLanguage || "en"
+      preferredLanguage: user.preferredLanguage || "en",
+      role: user.role || "user"
     });
     console.log("✅ Data Connect Success:", res);
   } catch (err) {

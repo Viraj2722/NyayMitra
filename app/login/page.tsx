@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Shield } from "lucide-react";
 
+const ADMIN_EMAIL = "admin@example.com";
+
 export default function LoginPage() {
   const { signInWithEmail, signInWithGoogle } = useAuth();
   const router = useRouter();
@@ -21,7 +23,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmail(email, password);
-      router.push("/");
+      router.push(email.toLowerCase() === ADMIN_EMAIL ? "/admin" : "/");
     } catch (err: any) {
       setError("Failed to sign in. Please check your credentials.");
     } finally {

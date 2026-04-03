@@ -3,10 +3,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { syncUserToDataConnect } from "@/lib/dataConnect";
-import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from "firebase/auth";
+import { User, getIdTokenResult, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from "firebase/auth";
+
+const ADMIN_EMAIL = "admin@example.com";
 
 interface AuthContextType {
   user: User | null;
+  isAdmin: boolean;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (e: string, p: string) => Promise<void>;
@@ -16,6 +19,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  isAdmin: false,
   loading: true,
   signInWithGoogle: async () => {},
   signInWithEmail: async () => {},
@@ -25,15 +29,53 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
+    let active = true;
+
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!active) {
+        return;
+      }
+
+      setUser(currentUser);
+
+      if (!currentUser) {
+        setIsAdmin(false);
+        setLoading(false);
+        return;
+      }
+
+      if (currentUser.email === ADMIN_EMAIL) {
+        setIsAdmin(true);
+        await syncUserToDataConnect({
+          uid: currentUser.uid,
+          name: currentUser.displayName || "Admin",
+          preferredLanguage: "English",
+          role: "admin"
+        });
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const tokenResult = await getIdTokenResult(currentUser, true);
+        const claims = tokenResult.claims as { admin?: boolean; role?: string };
+        setIsAdmin(claims.admin === true || claims.role === "admin");
+      } catch (error) {
+        console.error("Error reading Firebase custom claims", error);
+        setIsAdmin(false);
+      } finally {
+        setLoading(false);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
@@ -45,7 +87,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await syncUserToDataConnect({
           uid: result.user.uid,
           name: result.user.displayName || "Unknown",
-          preferredLanguage: "English"
+          preferredLanguage: "English",
+          role: "user"
         });
       }
     } catch (error) {
@@ -79,7 +122,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await syncUserToDataConnect({
           uid: result.user.uid,
           name: name,
-          preferredLanguage: "English"
+          preferredLanguage: "English",
+          role: "user"
         });
       }
     } catch (error) {
@@ -97,7 +141,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signInWithGoogle, signInWithEmail, registerWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, isAdmin, loading, signInWithGoogle, signInWithEmail, registerWithEmail, logout }}>
       {children}
     </AuthContext.Provider>
   );
