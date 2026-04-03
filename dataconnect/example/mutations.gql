@@ -1,0 +1,24 @@
+mutation CreateUser($uid: String!, $name: String, $preferredLanguage: String) @auth(level: PUBLIC) {
+  user_insert(data: {
+    uid: $uid,
+    name: $name,
+    preferredLanguage: $preferredLanguage
+  })
+}
+
+mutation CreateAppointment(
+  $userName: String!,
+  $userContact: String!,
+  $problemSummary: String!,
+  $preferredDate: Date!,
+  $status: String!
+) @auth(level: PUBLIC) {
+  appointment_insert(data: {
+    userName: $userName,
+    userContact: $userContact,
+    problemSummary: $problemSummary,
+    preferredDate: $preferredDate,
+    status: $status,
+    legalAidCenterId: "d69b3074-6725-4b08-8e8e-d95c47be73a1"
+  })
+}

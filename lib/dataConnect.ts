@@ -11,6 +11,13 @@
  * real generated mutations (e.g. `await createUser(...)`).
  */
 
+import { app } from "@/lib/firebase";
+import { getDataConnect } from "firebase/data-connect";
+import { createUser, createAppointment, connectorConfig } from "@/lib/dataconnect-generated";
+
+// Initialize Data Connect using the officially generated Connector Config
+const dataConnect = getDataConnect(app, connectorConfig);
+
 export interface User {
   uid: string;
   name?: string;
@@ -29,14 +36,32 @@ export interface AppointmentInput {
 }
 
 export const syncUserToDataConnect = async (user: User) => {
-  console.log("🟢 [Data Connect] Syncing User to Data base:", user);
-  // Example generated SDK call will look like:
-  // await executeMutation({ name: "CreateUser", variables: { ...user, createdAt: new Date() } });
+  console.log("🟢 [Data Connect] Sending User to PostgreSQL DB:", user);
+  try {
+    const res = await createUser(dataConnect, {
+      uid: user.uid,
+      name: user.name || "Anonymous",
+      preferredLanguage: user.preferredLanguage || "en"
+    });
+    console.log("✅ Data Connect Success:", res);
+  } catch (err) {
+    console.error("❌ Failed DataConnect User Insert:", err);
+  }
 };
 
 export const createAppointmentDataConnect = async (appointment: AppointmentInput) => {
-  console.log("🟢 [Data Connect] Creating Appointment in Database:", appointment);
-  // Example generated SDK call:
-  // await executeMutation({ name: "CreateAppointment", variables: { ...appointment, createdAt: new Date() } });
-  return true;
+  console.log("🟢 [Data Connect] Saving Appointment:", appointment);
+  try {
+    await createAppointment(dataConnect, {
+      userName: appointment.userName,
+      userContact: appointment.userContact,
+      problemSummary: appointment.problemSummary,
+      preferredDate: appointment.preferredDate, // Must be DateString format (YYYY-MM-DD format ideally)
+      status: appointment.status || "pending"
+    });
+    return true;
+  } catch (err) {
+    console.error("❌ Failed DataConnect Appointment Insert:", err);
+    return false;
+  }
 };
