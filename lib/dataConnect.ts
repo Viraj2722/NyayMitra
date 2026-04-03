@@ -85,13 +85,10 @@ export const createAppointmentDataConnect = async (appointment: AppointmentInput
   console.log("🟢 [Data Connect] Saving Appointment:", appointment);
   try {
     await createAppointment(dataConnect, {
-      userId: appointment.userId,
-      legalAidCenterId: appointment.legalAidCenterId,
       userName: appointment.userName,
       userContact: appointment.userContact,
       problemSummary: appointment.problemSummary,
       preferredDate: appointment.preferredDate,
-      preferredTime: appointment.preferredTime,
       status: appointment.status || "pending"
     });
     console.log("✅ Appointment created successfully");

@@ -1,5 +1,5 @@
 type User @table {
-  uid: String!  # Maps to Firebase Auth UID
+  uid: String! # Maps to Firebase Auth UID
   name: String
   preferredLanguage: String
   mobile: String
@@ -13,31 +13,31 @@ type LegalAidCenter @table {
   latitude: Float!
   longitude: Float!
   freeServices: Boolean!
-  categories: [String]!  # Changed to Array (e.g., ["labor", "domestic"]) for NoSQL
+  categories: [String]! # Changed to Array (e.g., ["labor", "domestic"]) for NoSQL
   timings: String
   description: String
   createdAt: Timestamp! @default(expr: "request.time")
 }
 
 type UserQuery @table {
-  user: User             # Optional (null if anonymous mode)
-  queryText: String      # Optional (do not save text if anonymous mode is ON)
+  user: User # Optional (null if anonymous mode)
+  queryText: String # Optional (do not save text if anonymous mode is ON)
   detectedLanguage: String!
   legalCategoryDetected: String
-  isUrgent: Boolean!     # Drives the 100/181 helpline trigger
-  isAnonymous: Boolean!  # HUGE WOW FACTOR parameter for judges
+  isUrgent: Boolean! # Drives the 100/181 helpline trigger
+  isAnonymous: Boolean! # HUGE WOW FACTOR parameter for judges
   aiResponse: String
   createdAt: Timestamp! @default(expr: "request.time")
 }
 
 type Appointment @table {
-  user: User             # Optional
+  user: User # Optional
   legalAidCenter: LegalAidCenter!
   userName: String!
   userContact: String!
   problemSummary: String!
   preferredDate: Date!
   preferredTime: String
-  status: String!        # "pending", "confirmed", "completed"
+  status: String! # "pending", "confirmed", "completed"
   createdAt: Timestamp! @default(expr: "request.time")
 }

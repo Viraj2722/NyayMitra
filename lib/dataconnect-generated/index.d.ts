@@ -31,6 +31,19 @@ export interface CreateUserData {
   user_insert: User_Key;
 }
 
+export interface CreateUserQueryData {
+  userQuery_insert: UserQuery_Key;
+}
+
+export interface CreateUserQueryVariables {
+  queryText?: string | null;
+  detectedLanguage: string;
+  legalCategoryDetected?: string | null;
+  isUrgent: boolean;
+  isAnonymous: boolean;
+  aiResponse?: string | null;
+}
+
 export interface CreateUserVariables {
   uid: string;
   name?: string | null;
@@ -76,4 +89,16 @@ export const createAppointmentRef: CreateAppointmentRef;
 
 export function createAppointment(vars: CreateAppointmentVariables): MutationPromise<CreateAppointmentData, CreateAppointmentVariables>;
 export function createAppointment(dc: DataConnect, vars: CreateAppointmentVariables): MutationPromise<CreateAppointmentData, CreateAppointmentVariables>;
+
+interface CreateUserQueryRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateUserQueryVariables): MutationRef<CreateUserQueryData, CreateUserQueryVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateUserQueryVariables): MutationRef<CreateUserQueryData, CreateUserQueryVariables>;
+  operationName: string;
+}
+export const createUserQueryRef: CreateUserQueryRef;
+
+export function createUserQuery(vars: CreateUserQueryVariables): MutationPromise<CreateUserQueryData, CreateUserQueryVariables>;
+export function createUserQuery(dc: DataConnect, vars: CreateUserQueryVariables): MutationPromise<CreateUserQueryData, CreateUserQueryVariables>;
 

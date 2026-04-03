@@ -1,11 +1,20 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AlertCircle, FileText, MapPin, CheckCircle, Shield, Calendar, X } from "lucide-react";
+import {
+  AlertCircle,
+  FileText,
+  MapPin,
+  CheckCircle,
+  Shield,
+  Calendar,
+  X,
+} from "lucide-react";
 import { createAppointmentDataConnect } from "@/lib/dataConnect";
 import { useAuth } from "@/context/AuthContext";
 
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+const BACKEND_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
 
 type Center = {
   id: string;
@@ -26,29 +35,39 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [loadingCenters, setLoadingCenters] = useState(true);
+  const [urgency, setUrgency] = useState<string>("normal");
+  const [category, setCategory] = useState<string>("Loading...");
   const { user } = useAuth();
-  
-  // High Urgency red banner indicator
-  const urgency: string = "normal"; 
 
   useEffect(() => {
-    const loadCenters = async () => {
-      try {
-        const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`);
-        if (!response.ok) {
-          throw new Error(`Failed to load centers: ${response.status}`);
-        }
-        const data = await response.json();
-        setCenters(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error loading legal centers", error);
-        setCenters([]);
-      } finally {
-        setLoadingCenters(false);
-      }
-    };
+    // Read from localStorage that was populated by app/chat/page.tsx
+    try {
+      const storedCategory = localStorage.getItem("nyaymitra_category");
+      if (storedCategory) setCategory(storedCategory);
 
-    loadCenters();
+      const storedUrgency = localStorage.getItem("nyaymitra_urgent");
+      if (storedUrgency)
+        setUrgency(storedUrgency === "true" ? "high" : "normal");
+
+      const storedCenters = localStorage.getItem("nyaymitra_centers");
+      if (storedCenters) {
+        setCenters(JSON.parse(storedCenters));
+      } else {
+        setCenters([
+          {
+            id: "fallback-1",
+            name: "DLSA Offline Fallback",
+            address: "Local Court Building",
+            phone: "1800-111-111",
+            distance: 2.5,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error loading legal centers from storage", error);
+    } finally {
+      setLoadingCenters(false);
+    }
   }, []);
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -108,46 +127,67 @@ export default function ResultsPage() {
       {urgency === "high" && (
         <div className="w-full bg-red-600 text-white font-semibold py-3 px-4 flex justify-center items-center gap-2">
           <AlertCircle className="w-5 h-5 animate-pulse" />
-          <span>Need immediate help? Call Women Helpline: 181, Police: 100</span>
+          <span>
+            Need immediate help? Call Women Helpline: 181, Police: 100
+          </span>
         </div>
       )}
 
       <main className="w-full max-w-4xl px-4 py-8 space-y-10">
-        
         {/* Header & Category */}
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-[var(--color-deep-blue)] font-bold text-sm shadow-sm">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-[var(--color-deep-blue)] font-bold text-sm shadow-sm capitalize">
             <span className="w-2 h-2 rounded-full bg-[var(--color-deep-blue)]" />
-            Category Detected: Labor Dispute
+            Category Detected: {category}
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Your Legal Guidance</h1>
-          <p className="text-gray-500 max-w-lg mx-auto">Based on your description, here are your rights under Indian Law and the next steps to take.</p>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+            Your Legal Guidance
+          </h1>
+          <p className="text-gray-500 max-w-lg mx-auto">
+            Based on your description, here are your rights under Indian Law and
+            the next steps to take.
+          </p>
         </div>
 
         {/* Know Your Rights - Animated Cards */}
         <section>
           <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
             <Shield className="w-6 h-6 text-[var(--color-saffron)]" />
-            <h2 className="text-2xl font-bold text-gray-800">Know Your Rights</h2>
+            <h2 className="text-2xl font-bold text-gray-800">
+              Know Your Rights
+            </h2>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
-              { title: "Right to Wages", desc: "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act." },
-              { title: "Protection from Unfair Dismissal", desc: "An employer must provide proper notice before termination under the Industrial Disputes Act." },
-              { title: "Right to Free Legal Aid", desc: "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation." }
+              {
+                title: "Right to Wages",
+                desc: "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act.",
+              },
+              {
+                title: "Protection from Unfair Dismissal",
+                desc: "An employer must provide proper notice before termination under the Industrial Disputes Act.",
+              },
+              {
+                title: "Right to Free Legal Aid",
+                desc: "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation.",
+              },
             ].map((right, i) => (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className="bg-white rounded-xl p-6 shadow-sm border border-orange-100 opacity-0 relative overflow-hidden group"
                 style={{
                   animation: `slideUpFadeIn 0.6s ease-out forwards`,
-                  animationDelay: `${i * 0.2}s`
+                  animationDelay: `${i * 0.2}s`,
                 }}
               >
                 <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-saffron)] transition-all group-hover:w-2" />
-                <h3 className="font-bold text-gray-900 text-lg mb-2">{right.title}</h3>
-                <p className="text-gray-600 text-sm leading-relaxed">{right.desc}</p>
+                <h3 className="font-bold text-gray-900 text-lg mb-2">
+                  {right.title}
+                </h3>
+                <p className="text-gray-600 text-sm leading-relaxed">
+                  {right.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -162,19 +202,33 @@ export default function ResultsPage() {
             </div>
             <ol className="space-y-6 relative border-l-2 border-blue-100 ml-3">
               <li className="pl-6 relative">
-                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">1</span>
+                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
+                  1
+                </span>
                 <h4 className="font-bold text-gray-800">Gather Evidence</h4>
-                <p className="text-sm text-gray-600 mt-1">Collect all employment contracts, ID cards, and WhatsApp messages with your employer.</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Collect all employment contracts, ID cards, and WhatsApp
+                  messages with your employer.
+                </p>
               </li>
               <li className="pl-6 relative">
-                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">2</span>
+                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
+                  2
+                </span>
                 <h4 className="font-bold text-gray-800">Draft a Complaint</h4>
-                <p className="text-sm text-gray-600 mt-1">Write a simple timeline of events in your preferred language.</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Write a simple timeline of events in your preferred language.
+                </p>
               </li>
               <li className="pl-6 relative">
-                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">3</span>
+                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
+                  3
+                </span>
                 <h4 className="font-bold text-gray-800">Visit a Free Center</h4>
-                <p className="text-sm text-gray-600 mt-1">Book an appointment or walk into a Legal Aid center listed below.</p>
+                <p className="text-sm text-gray-600 mt-1">
+                  Book an appointment or walk into a Legal Aid center listed
+                  below.
+                </p>
               </li>
             </ol>
           </div>
@@ -182,18 +236,20 @@ export default function ResultsPage() {
           <div>
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
               <MapPin className="w-6 h-6 text-green-600" />
-              <h2 className="text-2xl font-bold text-gray-800">Nearby Legal Centers</h2>
+              <h2 className="text-2xl font-bold text-gray-800">
+                Nearby Legal Centers
+              </h2>
             </div>
-            
+
             {/* Map Placeholder */}
             <div className="w-full h-48 bg-gray-200 rounded-xl mb-4 overflow-hidden relative shadow-inner">
-              <iframe 
-                width="100%" 
-                height="100%" 
-                frameBorder="0" 
-                scrolling="no" 
-                marginHeight={0} 
-                marginWidth={0} 
+              <iframe
+                width="100%"
+                height="100%"
+                frameBorder="0"
+                scrolling="no"
+                marginHeight={0}
+                marginWidth={0}
                 src="https://maps.google.com/maps?width=100%25&amp;height=600&amp;hl=en&amp;q=Mumbai+Courts+(Legal+Centers)&amp;t=&amp;z=11&amp;ie=UTF8&amp;iwloc=B&amp;output=embed"
               ></iframe>
             </div>
@@ -210,14 +266,25 @@ export default function ResultsPage() {
                 </div>
               )}
               {centers.map((center) => (
-                <div key={center.id} className="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div
+                  key={center.id}
+                  className="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow"
+                >
                   <div>
                     <h4 className="font-bold text-gray-900">{center.name}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">{center.address}{center.distance ? ` • ${center.distance} km` : ""}</p>
-                    <p className="text-xs font-medium text-[var(--color-deep-blue)] mt-1">{center.phone}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {center.address}
+                      {center.distance ? ` • ${center.distance} km` : ""}
+                    </p>
+                    <p className="text-xs font-medium text-[var(--color-deep-blue)] mt-1">
+                      {center.phone}
+                    </p>
                   </div>
-                  <button 
-                    onClick={() => { setSelectedCenter(center); setIsBooking(true); }}
+                  <button
+                    onClick={() => {
+                      setSelectedCenter(center);
+                      setIsBooking(true);
+                    }}
                     className="flex-shrink-0 bg-blue-50 text-[var(--color-deep-blue)] hover:bg-[var(--color-deep-blue)] hover:text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors"
                   >
                     Book
@@ -227,16 +294,19 @@ export default function ResultsPage() {
             </div>
           </div>
         </section>
-
       </main>
 
       {/* Basic Keyframes for Tailwind JIT */}
-      <style dangerouslySetInnerHTML={{__html: `
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @keyframes slideUpFadeIn {
           0% { opacity: 0; transform: translateY(20px); }
           100% { opacity: 1; transform: translateY(0); }
         }
-      `}} />
+      `,
+        }}
+      />
 
       {/* Appointment Booking Modal */}
       {isBooking && selectedCenter && (
@@ -248,7 +318,7 @@ export default function ResultsPage() {
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             <form onSubmit={handleBookingSubmit} className="p-6 space-y-4">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
@@ -262,7 +332,7 @@ export default function ResultsPage() {
                 <p className="font-semibold text-gray-900 dark:text-white">{selectedCenter.name}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{selectedCenter.phone}</p>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your Name <span className="text-red-500">*</span></label>
                 <input 

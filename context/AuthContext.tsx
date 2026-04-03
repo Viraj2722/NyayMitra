@@ -13,7 +13,7 @@ interface AuthContextType {
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (e: string, p: string) => Promise<void>;
-  registerWithEmail: (e: string, p: string, n: string) => Promise<void>;
+  registerWithEmail: (e: string, p: string, n: string, m?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const registerWithEmail = async (email: string, password: string, name: string) => {
+  const registerWithEmail = async (email: string, password: string, name: string, mobile?: string) => {
     // Note: To fully create a user in Firebase Auth with email/password:
     // import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
     const { createUserWithEmailAndPassword, updateProfile } = await import("firebase/auth");

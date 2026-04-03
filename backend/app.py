@@ -16,7 +16,11 @@ try:
         firebase_admin.initialize_app(cred)
     else:
         # Attempt to initialize without explicit credentials (e.g. if deployed)
-        firebase_admin.initialize_app()
+        try:
+            firebase_admin.initialize_app()
+        except Exception as inner_e:
+            print("Firebase Admin not initialized locally: ", inner_e)
+            
 except ValueError:
     print("Warning: Firebase is already initialized")
 except Exception as e:

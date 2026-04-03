@@ -56,22 +56,9 @@ def handle_query():
     # If no lat/lng, we still return top centers based on category
     centers = get_nearest_centers(lat or 0, lng or 0, category)
 
-    # Step 7: Save query (Skip if anonymous)
-    if not is_anonymous:
-        try:
-            db = firestore.client()
-            db.collection("queries").add({
-                # Notice we do NOT store the raw user input text to maintain privacy
-                "translated_keywords": translated[:100], # store a snippet or just omit
-                "language": lang,
-                "category": category,
-                "urgency": "high" if urgent else "normal",
-                "isAnonymous": is_anonymous,
-                "created_at": datetime.datetime.utcnow()
-            })
-        except Exception as e:
-            print("Failed to save query to DB:", e)
-
+    # Step 7: Note - We are now securely saving data to Firebase Data Connect 
+    # directly from the Next.js frontend to avoid duplicate saving and credential issues.
+    
     return jsonify({
         "response": ai_response,
         "category": category,

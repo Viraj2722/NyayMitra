@@ -13,6 +13,7 @@ This README will guide you through the process of using the generated JavaScript
 - [**Mutations**](#mutations)
   - [*CreateUser*](#createuser)
   - [*CreateAppointment*](#createappointment)
+  - [*CreateUserQuery*](#createuserquery)
 
 # Accessing the connector
 A connector is a collection of Queries and Mutations. One SDK is generated for each connector - this SDK is generated for the connector `example`. You can find more information about connectors in the [Data Connect documentation](https://firebase.google.com/docs/data-connect#how-does).
@@ -102,6 +103,7 @@ export interface CreateUserVariables {
   uid: string;
   name?: string | null;
   preferredLanguage?: string | null;
+  role?: string | null;
 }
 ```
 ### Return Type
@@ -124,13 +126,14 @@ const createUserVars: CreateUserVariables = {
   uid: ..., 
   name: ..., // optional
   preferredLanguage: ..., // optional
+  role: ..., // optional
 };
 
 // Call the `createUser()` function to execute the mutation.
 // You can use the `await` keyword to wait for the promise to resolve.
 const { data } = await createUser(createUserVars);
 // Variables can be defined inline as well.
-const { data } = await createUser({ uid: ..., name: ..., preferredLanguage: ..., });
+const { data } = await createUser({ uid: ..., name: ..., preferredLanguage: ..., role: ..., });
 
 // You can also pass in a `DataConnect` instance to the action shortcut function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -156,12 +159,13 @@ const createUserVars: CreateUserVariables = {
   uid: ..., 
   name: ..., // optional
   preferredLanguage: ..., // optional
+  role: ..., // optional
 };
 
 // Call the `createUserRef()` function to get a reference to the mutation.
 const ref = createUserRef(createUserVars);
 // Variables can be defined inline as well.
-const ref = createUserRef({ uid: ..., name: ..., preferredLanguage: ..., });
+const ref = createUserRef({ uid: ..., name: ..., preferredLanguage: ..., role: ..., });
 
 // You can also pass in a `DataConnect` instance to the `MutationRef` function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -298,6 +302,130 @@ console.log(data.appointment_insert);
 executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.appointment_insert);
+});
+```
+
+## CreateUserQuery
+You can execute the `CreateUserQuery` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+createUserQuery(vars: CreateUserQueryVariables): MutationPromise<CreateUserQueryData, CreateUserQueryVariables>;
+
+interface CreateUserQueryRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateUserQueryVariables): MutationRef<CreateUserQueryData, CreateUserQueryVariables>;
+}
+export const createUserQueryRef: CreateUserQueryRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+createUserQuery(dc: DataConnect, vars: CreateUserQueryVariables): MutationPromise<CreateUserQueryData, CreateUserQueryVariables>;
+
+interface CreateUserQueryRef {
+  ...
+  (dc: DataConnect, vars: CreateUserQueryVariables): MutationRef<CreateUserQueryData, CreateUserQueryVariables>;
+}
+export const createUserQueryRef: CreateUserQueryRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the createUserQueryRef:
+```typescript
+const name = createUserQueryRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `CreateUserQuery` mutation requires an argument of type `CreateUserQueryVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface CreateUserQueryVariables {
+  queryText?: string | null;
+  detectedLanguage: string;
+  legalCategoryDetected?: string | null;
+  isUrgent: boolean;
+  isAnonymous: boolean;
+  aiResponse?: string | null;
+}
+```
+### Return Type
+Recall that executing the `CreateUserQuery` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `CreateUserQueryData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface CreateUserQueryData {
+  userQuery_insert: UserQuery_Key;
+}
+```
+### Using `CreateUserQuery`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, createUserQuery, CreateUserQueryVariables } from '@dataconnect/my-app';
+
+// The `CreateUserQuery` mutation requires an argument of type `CreateUserQueryVariables`:
+const createUserQueryVars: CreateUserQueryVariables = {
+  queryText: ..., // optional
+  detectedLanguage: ..., 
+  legalCategoryDetected: ..., // optional
+  isUrgent: ..., 
+  isAnonymous: ..., 
+  aiResponse: ..., // optional
+};
+
+// Call the `createUserQuery()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await createUserQuery(createUserQueryVars);
+// Variables can be defined inline as well.
+const { data } = await createUserQuery({ queryText: ..., detectedLanguage: ..., legalCategoryDetected: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await createUserQuery(dataConnect, createUserQueryVars);
+
+console.log(data.userQuery_insert);
+
+// Or, you can use the `Promise` API.
+createUserQuery(createUserQueryVars).then((response) => {
+  const data = response.data;
+  console.log(data.userQuery_insert);
+});
+```
+
+### Using `CreateUserQuery`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, createUserQueryRef, CreateUserQueryVariables } from '@dataconnect/my-app';
+
+// The `CreateUserQuery` mutation requires an argument of type `CreateUserQueryVariables`:
+const createUserQueryVars: CreateUserQueryVariables = {
+  queryText: ..., // optional
+  detectedLanguage: ..., 
+  legalCategoryDetected: ..., // optional
+  isUrgent: ..., 
+  isAnonymous: ..., 
+  aiResponse: ..., // optional
+};
+
+// Call the `createUserQueryRef()` function to get a reference to the mutation.
+const ref = createUserQueryRef(createUserQueryVars);
+// Variables can be defined inline as well.
+const ref = createUserQueryRef({ queryText: ..., detectedLanguage: ..., legalCategoryDetected: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = createUserQueryRef(dataConnect, createUserQueryVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.userQuery_insert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.userQuery_insert);
 });
 ```
 

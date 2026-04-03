@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Send, Mic, Globe, Info, Scale } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createUserQuery } from "@dataconnect/my-app";
+import { dataConnect } from "@/lib/firebase";
 
 interface Message {
   id: string;
@@ -20,7 +22,7 @@ export default function ChatPage() {
     },
   ]);
   const [input, setInput] = useState("");
-  const [language, setLanguage] = useState("English");
+  const [language, setLanguage] = useState("Hindi"); // Defaulting to Hindi for a more inclusive starting experience
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -36,6 +38,7 @@ export default function ChatPage() {
 
     const userMessage: Message = { id: Date.now().toString(), text: input, sender: "user" };
     setMessages((prev) => [...prev, userMessage]);
+    
     const currentInput = input;
     setInput("");
     setIsLoading(true);
@@ -66,13 +69,32 @@ export default function ChatPage() {
         sender: "ai",
       };
       
+      
       setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
+      
+      // Pass the generated data to the results page via localStorage (hackathon speedrun!)
+      if (data.category) {
+         localStorage.setItem("nyaymitra_category", data.category);
+         localStorage.setItem("nyaymitra_centers", JSON.stringify(data.centers || []));
+         localStorage.setItem("nyaymitra_urgent", data.urgent);
+         localStorage.setItem("nyaymitra_detected_lang", data.detected_language);
+      }
 
-      // Auto-navigate to results page after showing the response
-      setTimeout(() => {
-        router.push("/results");
-      }, 2000);
+      // Store in Data Connect
+      try {
+        await createUserQuery(dataConnect, {
+          queryText: currentInput,
+          detectedLanguage: data.detected_language || "unknown",
+          legalCategoryDetected: data.category,
+          isUrgent: data.urgent || false,
+          isAnonymous: false,
+          aiResponse: data.response
+        });
+        console.log("Successfully stored query in Firebase Data Connect!");
+      } catch (dbError) {
+        console.error("Failed to store in Data Connect:", dbError);
+      }
+
     } catch (error) {
       console.error("Error sending message:", error);
       const errorMessage: Message = {
@@ -81,11 +103,17 @@ export default function ChatPage() {
         sender: "ai",
       };
       setMessages((prev) => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
+
+      // Auto-navigate to results page after showing the response
+      setTimeout(() => {
+        router.push("/results");
+      }, 2000);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -102,7 +130,25 @@ export default function ChatPage() {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = language === "English" ? "en-US" : language === "Hindi" ? "hi-IN" : "mr-IN";
+    
+    // We target auto-detection or the generalized language list
+    const getLangCode = (l: string) => {
+      switch(l) {
+        case "Hindi": return "hi-IN";
+        case "Marathi": return "mr-IN";
+        case "Bengali": return "bn-IN";
+        case "Gujarati": return "gu-IN";
+        case "Tamil": return "ta-IN";
+        case "Telugu": return "te-IN";
+        case "Kannada": return "kn-IN";
+        case "Malayalam": return "ml-IN";
+        case "Punjabi": return "pa-IN";
+        case "Urdu": return "ur-IN";
+        default: return "en-IN"; // English default
+      }
+    };
+    
+    recognition.lang = getLangCode(language);
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
@@ -150,6 +196,14 @@ export default function ChatPage() {
             <option className="text-black">English</option>
             <option className="text-black">Hindi</option>
             <option className="text-black">Marathi</option>
+            <option className="text-black">Bengali</option>
+            <option className="text-black">Gujarati</option>
+            <option className="text-black">Tamil</option>
+            <option className="text-black">Telugu</option>
+            <option className="text-black">Kannada</option>
+            <option className="text-black">Malayalam</option>
+            <option className="text-black">Punjabi</option>
+            <option className="text-black">Urdu</option>
           </select>
         </div>
       </div>

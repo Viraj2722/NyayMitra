@@ -20,6 +20,7 @@ You can also follow the instructions from the [Data Connect documentation](https
 - [**Mutations**](#mutations)
   - [*CreateUser*](#createuser)
   - [*CreateAppointment*](#createappointment)
+  - [*CreateUserQuery*](#createuserquery)
 
 # TanStack Query Firebase & TanStack React Query
 This SDK provides [React](https://react.dev/) hooks generated specific to your application, for the operations found in the connector `example`. These hooks are generated using [TanStack Query Firebase](https://react-query-firebase.invertase.dev/) by our partners at Invertase, a library built on top of [TanStack React Query v5](https://tanstack.com/query/v5/docs/framework/react/overview).
@@ -135,6 +136,7 @@ export interface CreateUserVariables {
   uid: string;
   name?: string | null;
   preferredLanguage?: string | null;
+  role?: string | null;
 }
 ```
 ### Return Type
@@ -187,10 +189,11 @@ export default function CreateUserComponent() {
     uid: ..., 
     name: ..., // optional
     preferredLanguage: ..., // optional
+    role: ..., // optional
   };
   mutation.mutate(createUserVars);
   // Variables can be defined inline as well.
-  mutation.mutate({ uid: ..., name: ..., preferredLanguage: ..., });
+  mutation.mutate({ uid: ..., name: ..., preferredLanguage: ..., role: ..., });
 
   // You can also pass in a `useDataConnectMutationOptions` object to `UseMutationResult.mutate()`.
   const options = {
@@ -312,6 +315,110 @@ export default function CreateAppointmentComponent() {
   // If the Mutation is successful, you can access the data returned using the `UseMutationResult.data` field.
   if (mutation.isSuccess) {
     console.log(mutation.data.appointment_insert);
+  }
+  return <div>Mutation execution {mutation.isSuccess ? 'successful' : 'failed'}!</div>;
+}
+```
+
+## CreateUserQuery
+You can execute the `CreateUserQuery` Mutation using the `UseMutationResult` object returned by the following Mutation hook function (which is defined in [dataconnect-generated/react/index.d.ts](./index.d.ts)):
+```javascript
+useCreateUserQuery(options?: useDataConnectMutationOptions<CreateUserQueryData, FirebaseError, CreateUserQueryVariables>): UseDataConnectMutationResult<CreateUserQueryData, CreateUserQueryVariables>;
+```
+You can also pass in a `DataConnect` instance to the Mutation hook function.
+```javascript
+useCreateUserQuery(dc: DataConnect, options?: useDataConnectMutationOptions<CreateUserQueryData, FirebaseError, CreateUserQueryVariables>): UseDataConnectMutationResult<CreateUserQueryData, CreateUserQueryVariables>;
+```
+
+### Variables
+The `CreateUserQuery` Mutation requires an argument of type `CreateUserQueryVariables`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+
+```javascript
+export interface CreateUserQueryVariables {
+  queryText?: string | null;
+  detectedLanguage: string;
+  legalCategoryDetected?: string | null;
+  isUrgent: boolean;
+  isAnonymous: boolean;
+  aiResponse?: string | null;
+}
+```
+### Return Type
+Recall that calling the `CreateUserQuery` Mutation hook function returns a `UseMutationResult` object. This object holds the state of your Mutation, including whether the Mutation is loading, has completed, or has succeeded/failed, among other things.
+
+To check the status of a Mutation, use the `UseMutationResult.status` field. You can also check for pending / success / error status using the `UseMutationResult.isPending`, `UseMutationResult.isSuccess`, and `UseMutationResult.isError` fields.
+
+To execute the Mutation, call `UseMutationResult.mutate()`. This function executes the Mutation, but does not return the data from the Mutation.
+
+To access the data returned by a Mutation, use the `UseMutationResult.data` field. The data for the `CreateUserQuery` Mutation is of type `CreateUserQueryData`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+```javascript
+export interface CreateUserQueryData {
+  userQuery_insert: UserQuery_Key;
+}
+```
+
+To learn more about the `UseMutationResult` object, see the [TanStack React Query documentation](https://tanstack.com/query/v5/docs/framework/react/reference/useMutation).
+
+### Using `CreateUserQuery`'s Mutation hook function
+
+```javascript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, CreateUserQueryVariables } from '@dataconnect/my-app';
+import { useCreateUserQuery } from '@dataconnect/my-app/react'
+
+export default function CreateUserQueryComponent() {
+  // Call the Mutation hook function to get a `UseMutationResult` object which holds the state of your Mutation.
+  const mutation = useCreateUserQuery();
+
+  // You can also pass in a `DataConnect` instance to the Mutation hook function.
+  const dataConnect = getDataConnect(connectorConfig);
+  const mutation = useCreateUserQuery(dataConnect);
+
+  // You can also pass in a `useDataConnectMutationOptions` object to the Mutation hook function.
+  const options = {
+    onSuccess: () => { console.log('Mutation succeeded!'); }
+  };
+  const mutation = useCreateUserQuery(options);
+
+  // You can also pass both a `DataConnect` instance and a `useDataConnectMutationOptions` object.
+  const dataConnect = getDataConnect(connectorConfig);
+  const options = {
+    onSuccess: () => { console.log('Mutation succeeded!'); }
+  };
+  const mutation = useCreateUserQuery(dataConnect, options);
+
+  // After calling the Mutation hook function, you must call `UseMutationResult.mutate()` to execute the Mutation.
+  // The `useCreateUserQuery` Mutation requires an argument of type `CreateUserQueryVariables`:
+  const createUserQueryVars: CreateUserQueryVariables = {
+    queryText: ..., // optional
+    detectedLanguage: ..., 
+    legalCategoryDetected: ..., // optional
+    isUrgent: ..., 
+    isAnonymous: ..., 
+    aiResponse: ..., // optional
+  };
+  mutation.mutate(createUserQueryVars);
+  // Variables can be defined inline as well.
+  mutation.mutate({ queryText: ..., detectedLanguage: ..., legalCategoryDetected: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., });
+
+  // You can also pass in a `useDataConnectMutationOptions` object to `UseMutationResult.mutate()`.
+  const options = {
+    onSuccess: () => { console.log('Mutation succeeded!'); }
+  };
+  mutation.mutate(createUserQueryVars, options);
+
+  // Then, you can render your component dynamically based on the status of the Mutation.
+  if (mutation.isPending) {
+    return <div>Loading...</div>;
+  }
+
+  if (mutation.isError) {
+    return <div>Error: {mutation.error.message}</div>;
+  }
+
+  // If the Mutation is successful, you can access the data returned using the `UseMutationResult.data` field.
+  if (mutation.isSuccess) {
+    console.log(mutation.data.userQuery_insert);
   }
   return <div>Mutation execution {mutation.isSuccess ? 'successful' : 'failed'}!</div>;
 }

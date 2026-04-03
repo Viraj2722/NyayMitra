@@ -84,3 +84,23 @@ mutation CreateQuery(
     aiResponse: $aiResponse
   })
 }
+
+mutation CreateUserQuery(
+  $queryText: String
+  $detectedLanguage: String!
+  $legalCategoryDetected: String
+  $isUrgent: Boolean!
+  $isAnonymous: Boolean!
+  $aiResponse: String
+) @auth(level: PUBLIC) {
+  userQuery_insert(
+    data: {
+      queryText: $queryText
+      detectedLanguage: $detectedLanguage
+      legalCategoryDetected: $legalCategoryDetected
+      isUrgent: $isUrgent
+      isAnonymous: $isAnonymous
+      aiResponse: $aiResponse
+    }
+  )
+}
