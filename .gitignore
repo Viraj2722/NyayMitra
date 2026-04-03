@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,43 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# -----------------------
+# NyayMitra Specific additions
+# -----------------------
+
+# Python / Flask Backend
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.venv/
+.pytest_cache/
+
+# Firebase / Google Cloud
+firebase_credentials.json
+backend/firebase_credentials.json
+firebase-debug.log
+.firebase/
+.agents/
+.kiro/
+.windsurf/
+
+dataconnect/.dataconnect/
+
+# -----------------------
+# IDEs and Editors
+# -----------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# OS generated files
+Thumbs.db
