@@ -25,15 +25,45 @@ export interface User {
   mobile?: string;
 }
 
+export interface LegalAidCenter {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+  freeServices: boolean;
+  categories: string[];
+  timings?: string;
+  description?: string;
+}
+
+export interface UserQuery {
+  id: string;
+  userId?: string;
+  queryText?: string;
+  detectedLanguage: string;
+  legalCategoryDetected?: string;
+  isUrgent: boolean;
+  isAnonymous: boolean;
+  aiResponse?: string;
+  createdAt?: string;
+}
+
 export interface AppointmentInput {
-  userId?: string; // Maps to User
+  userId?: string;
   legalAidCenterId: string;
   userName: string;
   userContact: string;
   problemSummary: string;
-  preferredDate: string; // Date
+  preferredDate: string;
   preferredTime?: string;
-  status: string; // "pending", "confirmed", "completed"
+  status: string;
+}
+
+export interface Appointment extends AppointmentInput {
+  id: string;
+  createdAt?: string;
 }
 
 export const syncUserToDataConnect = async (user: User) => {
@@ -55,15 +85,39 @@ export const createAppointmentDataConnect = async (appointment: AppointmentInput
   console.log("🟢 [Data Connect] Saving Appointment:", appointment);
   try {
     await createAppointment(dataConnect, {
+      userId: appointment.userId,
+      legalAidCenterId: appointment.legalAidCenterId,
       userName: appointment.userName,
       userContact: appointment.userContact,
       problemSummary: appointment.problemSummary,
-      preferredDate: appointment.preferredDate, // Must be DateString format (YYYY-MM-DD format ideally)
+      preferredDate: appointment.preferredDate,
+      preferredTime: appointment.preferredTime,
       status: appointment.status || "pending"
     });
+    console.log("✅ Appointment created successfully");
     return true;
   } catch (err) {
     console.error("❌ Failed DataConnect Appointment Insert:", err);
+    return false;
+  }
+};
+
+export const createUserQueryDataConnect = async (query: {
+  userId?: string;
+  queryText?: string;
+  detectedLanguage: string;
+  legalCategoryDetected?: string;
+  isUrgent: boolean;
+  isAnonymous: boolean;
+  aiResponse?: string;
+}) => {
+  console.log("🟢 [Data Connect] Saving User Query:", query);
+  try {
+    // This would be implemented when the query mutation is generated
+    // For now, we'll rely on backend Firestore write
+    return true;
+  } catch (err) {
+    console.error("❌ Failed DataConnect Query Insert:", err);
     return false;
   }
 };

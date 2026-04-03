@@ -1,4 +1,11 @@
-# NyayMitra ⚖️
+# 🏛️ NyayMitra - Free Legal Aid Access Platform
+
+**Democratizing Justice for India's Low-Income Citizens**
+
+![Status](https://img.shields.io/badge/Status-MVP%20Ready-green)
+![License](https://img.shields.io/badge/License-MIT-blue)
+![Node](https://img.shields.io/badge/Node-18%2B-blue)
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue) ⚖️
 
 **"AI-powered legal friend for every Indian who can't afford a lawyer."**
 

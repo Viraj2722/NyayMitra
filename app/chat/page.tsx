@@ -40,21 +40,49 @@ export default function ChatPage() {
     setInput("");
     setIsLoading(true);
 
-    // Dummy API call / Backend integration placeholder
-    setTimeout(() => {
+    try {
+      const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+      
+      // Call backend API to process the query
+      const response = await fetch(`${BACKEND_BASE_URL}/api/query/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: currentInput,
+          lat: null, // Use user location if available
+          lng: null,
+          isAnonymous: false,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const data = await response.json();
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Understood. Based on what you said ("${currentInput}"), this seems related to a Labor Dispute. I have categorized your issue and prepared "Know Your Rights" information in ${language}. Let's look at the next steps and legal centers near you.`,
+        text: data.response || `I understand your concern about ${data.category || "this legal matter"}. Based on the information provided, I've identified this as a ${data.category || "general legal"} issue. Click "Next" to see your rights, nearby legal centers, and how to book a consultation.`,
         sender: "ai",
       };
+      
       setMessages((prev) => [...prev, aiMessage]);
       setIsLoading(false);
 
-      // Simulate navigation to results page after 3 seconds of getting reply
+      // Auto-navigate to results page after showing the response
       setTimeout(() => {
         router.push("/results");
-      }, 3000);
-    }, 1500);
+      }, 2000);
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: "Sorry, I'm having trouble processing your request. Please check your connection and try again.",
+        sender: "ai",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

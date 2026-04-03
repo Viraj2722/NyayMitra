@@ -21,7 +21,9 @@ type Center = {
 export default function ResultsPage() {
   const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
   const [isBooking, setIsBooking] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [loadingCenters, setLoadingCenters] = useState(true);
   const { user } = useAuth();
@@ -51,23 +53,53 @@ export default function ResultsPage() {
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
     const formData = new FormData(e.target as HTMLFormElement);
+    const name = formData.get("name") as string;
+    const phone = formData.get("phone") as string;
+    const date = formData.get("date") as string;
+    const time = formData.get("time") as string;
+    const description = formData.get("description") as string;
+
+    // Validation
+    if (!name || !phone || !date || !description) {
+      setError("Please fill in all required fields");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (phone.length < 10 || phone.length > 13) {
+      setError("Please enter a valid phone number");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      await createAppointmentDataConnect({
+      const result = await createAppointmentDataConnect({
         userId: user ? user.uid : undefined,
-        legalAidCenterId: selectedCenter.id.toString(),
-        userName: formData.get("name") as string,
-        userContact: formData.get("phone") as string,
-        preferredDate: formData.get("date") as string,
-        problemSummary: formData.get("description") as string,
+        legalAidCenterId: selectedCenter!.id.toString(),
+        userName: name,
+        userContact: phone,
+        problemSummary: description,
+        preferredDate: date,
+        preferredTime: time,
         status: "pending"
       });
-      setIsBooking(false);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 5000);
+
+      if (result) {
+        setIsBooking(false);
+        setSuccess(true);
+        setTimeout(() => setSuccess(false), 5000);
+      } else {
+        setError("Failed to book appointment. Please try again.");
+      }
     } catch (err) {
       console.error("Error booking appointment", err);
-      alert("Failed to book appointment. Please try again.");
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -209,45 +241,97 @@ export default function ResultsPage() {
       {/* Appointment Booking Modal */}
       {isBooking && selectedCenter && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[slideUpFadeIn_0.3s_ease-out]">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[slideUpFadeIn_0.3s_ease-out]">
             <div className="bg-[var(--color-deep-blue)] p-4 flex justify-between items-center text-white">
               <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="w-5 h-5"/> Book Consultation</h3>
-              <button onClick={() => setIsBooking(false)} className="text-blue-200 hover:text-white transition-colors">
+              <button onClick={() => { setIsBooking(false); setError(null); }} className="text-blue-200 hover:text-white transition-colors">
                 <X className="w-6 h-6" />
               </button>
             </div>
             
             <form onSubmit={handleBookingSubmit} className="p-6 space-y-4">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <div>
-                <p className="text-sm text-gray-500">Center</p>
-                <p className="font-semibold text-gray-900">{selectedCenter.name}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Center</p>
+                <p className="font-semibold text-gray-900 dark:text-white">{selectedCenter.name}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{selectedCenter.phone}</p>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
-                <input required name="name" defaultValue={user?.displayName || ""} type="text" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="Ramesh Kumar" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your Name <span className="text-red-500">*</span></label>
+                <input 
+                  required 
+                  name="name" 
+                  defaultValue={user?.displayName || ""} 
+                  type="text" 
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                  placeholder="Ramesh Kumar" 
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                <input required name="phone" type="tel" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" placeholder="98XXXXXXXX" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number <span className="text-red-500">*</span></label>
+                <input 
+                  required 
+                  name="phone" 
+                  type="tel" 
+                  pattern="[0-9]{10,13}"
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                  placeholder="9876543210" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Date <span className="text-red-500">*</span></label>
+                  <input 
+                    required 
+                    name="date" 
+                    type="date" 
+                    min={new Date().toISOString().split('T')[0]}
+                    className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time (Optional)</label>
+                  <input 
+                    name="time" 
+                    type="time" 
+                    className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Preferred Date</label>
-                <input required name="date" type="date" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brief Description <span className="text-red-500">*</span></label>
+                <textarea 
+                  required 
+                  name="description" 
+                  rows={3} 
+                  maxLength={500}
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" 
+                  placeholder="Explain your legal issue briefly (e.g., unpaid wages, harassment, contract dispute)..."
+                ></textarea>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This helps the legal advisor prepare for your consultation</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Brief Description</label>
-                <textarea required name="description" rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" placeholder="Unpaid wages since 3 months..."></textarea>
-              </div>
-
-              <div className="pt-2">
-                <button type="submit" className="w-full bg-[var(--color-saffron)] hover:bg-orange-600 text-white font-bold py-3 rounded-lg shadow-md transition-colors">
-                  Confirm Booking
+              <div className="pt-2 space-y-3">
+                <button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  className="w-full bg-[var(--color-saffron)] hover:bg-orange-600 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg shadow-md transition-colors"
+                >
+                  {isSubmitting ? "Booking..." : "Confirm Booking"}
                 </button>
-                <p className="text-center text-xs text-gray-500 mt-3 font-medium flex justify-center items-center gap-1.5"><Shield className="w-3.5 h-3.5"/> All information is kept completely confidential.</p>
+                <p className="text-center text-xs text-gray-500 dark:text-gray-400 font-medium flex justify-center items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5"/> All information is kept completely confidential.
+                </p>
               </div>
             </form>
           </div>
