@@ -70,6 +70,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       if (result.user) {
         await updateProfile(result.user, { displayName: name });
+        
+        // Force reload the user and manually push to React state 
+        // since `updateProfile` does not automatically fire `onAuthStateChanged`.
+        await auth.currentUser?.reload();
+        setUser(auth.currentUser);
+
         await syncUserToDataConnect({
           uid: result.user.uid,
           name: name,
