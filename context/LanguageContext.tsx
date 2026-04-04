@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 export const LANGUAGE_STORAGE_KEY = "nyaymitra_language";
 
@@ -90,6 +90,39 @@ const EN_DEFAULTS: TranslationMap = {
   "appointments.tip2": "✓ Bring relevant documents (employment contract, ID, etc.)",
   "appointments.tip3": "✓ All consultations are confidential and free",
   "appointments.tip4": "✓ Call the center ahead if you need to reschedule",
+  "appointments.loadError": "Failed to load appointments. Please try again.",
+  "appointments.noSummary": "No summary provided",
+  "common.now": "Now",
+  "admin.adminConsole": "Admin Console",
+  "admin.protectedDashboard": "Protected dashboard for managing centers and monitoring live queries.",
+  "admin.adminEmail": "Admin Email",
+  "admin.password": "Password",
+  "admin.systemStatus": "System Status",
+  "admin.loadingLiveData": "Loading live data...",
+  "admin.liveDataConnected": "Live data connected",
+  "admin.centers": "Centers",
+  "admin.liveRowsCenters": "Live rows from Firestore",
+  "admin.queries": "Queries",
+  "admin.recentQueryRecords": "Recent query records",
+  "admin.appointments": "Appointments",
+  "admin.bookedRows": "Booked rows from the database",
+  "admin.recentQueries": "Recent Queries",
+  "admin.recentAppointments": "Recent Appointments",
+  "admin.live": "Live",
+  "admin.timestamp": "Timestamp",
+  "admin.category": "Category",
+  "admin.language": "Language",
+  "admin.urgency": "Urgency",
+  "admin.noRecentQueries": "No recent queries found.",
+  "admin.noRecentAppointments": "No recent appointments found.",
+  "admin.noCentersFound": "No centers found in the database.",
+  "admin.manageCenters": "Manage Centers",
+  "admin.centerName": "Center Name",
+  "admin.contactSetup": "Contact Setup",
+  "admin.coordinatesAddress": "Coordinates & Address",
+  "admin.fullAddress": "Full Address...",
+  "admin.addToDatabase": "Add to Database",
+  "admin.monitorDesc": "Monitor live queries and keep legal centers up to date from one place.",
 };
 
 const hi: TranslationMap = {
@@ -205,6 +238,39 @@ const hi: TranslationMap = {
   "appointments.tip2": "✓ आवश्यक दस्तावेज साथ लाएं",
   "appointments.tip3": "✓ सभी परामर्श गोपनीय और मुफ्त हैं",
   "appointments.tip4": "✓ रीशेड्यूल के लिए केंद्र को पहले कॉल करें",
+  "appointments.loadError": "अपॉइंटमेंट लोड नहीं हो सके। कृपया फिर से प्रयास करें।",
+  "appointments.noSummary": "कोई सारांश उपलब्ध नहीं है",
+  "common.now": "अभी",
+  "admin.adminConsole": "एडमिन कंसोल",
+  "admin.protectedDashboard": "केंद्र प्रबंधन और लाइव क्वेरी निगरानी के लिए सुरक्षित डैशबोर्ड।",
+  "admin.adminEmail": "एडमिन ईमेल",
+  "admin.password": "पासवर्ड",
+  "admin.systemStatus": "सिस्टम स्थिति",
+  "admin.loadingLiveData": "लाइव डेटा लोड हो रहा है...",
+  "admin.liveDataConnected": "लाइव डेटा जुड़ा हुआ है",
+  "admin.centers": "केंद्र",
+  "admin.liveRowsCenters": "Firestore से लाइव पंक्तियाँ",
+  "admin.queries": "प्रश्न",
+  "admin.recentQueryRecords": "हाल की क्वेरी रिकॉर्ड",
+  "admin.appointments": "अपॉइंटमेंट",
+  "admin.bookedRows": "डेटाबेस से बुक की गई पंक्तियाँ",
+  "admin.recentQueries": "हाल की क्वेरियाँ",
+  "admin.recentAppointments": "हाल की अपॉइंटमेंट",
+  "admin.live": "लाइव",
+  "admin.timestamp": "समय",
+  "admin.category": "श्रेणी",
+  "admin.language": "भाषा",
+  "admin.urgency": "तत्कालता",
+  "admin.noRecentQueries": "कोई हाल की क्वेरी नहीं मिली।",
+  "admin.noRecentAppointments": "कोई हाल की अपॉइंटमेंट नहीं मिली।",
+  "admin.noCentersFound": "डेटाबेस में कोई केंद्र नहीं मिला।",
+  "admin.manageCenters": "केंद्र प्रबंधित करें",
+  "admin.centerName": "केंद्र का नाम",
+  "admin.contactSetup": "संपर्क सेटअप",
+  "admin.coordinatesAddress": "निर्देशांक और पता",
+  "admin.fullAddress": "पूरा पता...",
+  "admin.addToDatabase": "डेटाबेस में जोड़ें",
+  "admin.monitorDesc": "एक ही जगह से लाइव क्वेरियाँ मॉनिटर करें और कानूनी केंद्र अपडेट रखें।",
   "admin.invalidCreds": "अमान्य एडमिन क्रेडेंशियल",
   "admin.checking": "एक्सेस जांच रहे हैं",
   "admin.verifying": "आपकी Firebase एडमिन पहुंच सत्यापित हो रही है।",
@@ -329,6 +395,39 @@ const mr: TranslationMap = {
   "appointments.tip2": "✓ आवश्यक कागदपत्रे सोबत आणा",
   "appointments.tip3": "✓ सर्व सल्लामसलती गोपनीय आणि मोफत आहेत",
   "appointments.tip4": "✓ वेळ बदलायची असल्यास आधी केंद्राशी संपर्क करा",
+  "appointments.loadError": "अपॉइंटमेंट लोड होऊ शकल्या नाहीत. कृपया पुन्हा प्रयत्न करा.",
+  "appointments.noSummary": "सारांश उपलब्ध नाही",
+  "common.now": "आत्ता",
+  "admin.adminConsole": "अॅडमिन कन्सोल",
+  "admin.protectedDashboard": "केंद्र व्यवस्थापन आणि लाइव्ह क्वेरी देखरेखीसाठी सुरक्षित डॅशबोर्ड.",
+  "admin.adminEmail": "अॅडमिन ईमेल",
+  "admin.password": "पासवर्ड",
+  "admin.systemStatus": "सिस्टम स्थिती",
+  "admin.loadingLiveData": "लाइव्ह डेटा लोड होत आहे...",
+  "admin.liveDataConnected": "लाइव्ह डेटा जोडलेला आहे",
+  "admin.centers": "केंद्रे",
+  "admin.liveRowsCenters": "Firestore मधील लाइव्ह पंक्ती",
+  "admin.queries": "प्रश्न",
+  "admin.recentQueryRecords": "अलीकडील क्वेरी नोंदी",
+  "admin.appointments": "अपॉइंटमेंट",
+  "admin.bookedRows": "डेटाबेसमधील बुक केलेल्या पंक्ती",
+  "admin.recentQueries": "अलीकडील क्वेर्या",
+  "admin.recentAppointments": "अलीकडील अपॉइंटमेंट",
+  "admin.live": "लाइव्ह",
+  "admin.timestamp": "वेळ",
+  "admin.category": "श्रेणी",
+  "admin.language": "भाषा",
+  "admin.urgency": "तातडी",
+  "admin.noRecentQueries": "अलीकडील क्वेर्या सापडल्या नाहीत.",
+  "admin.noRecentAppointments": "अलीकडील अपॉइंटमेंट सापडल्या नाहीत.",
+  "admin.noCentersFound": "डेटाबेसमध्ये कोणतीही केंद्रे सापडली नाहीत.",
+  "admin.manageCenters": "केंद्रे व्यवस्थापित करा",
+  "admin.centerName": "केंद्राचे नाव",
+  "admin.contactSetup": "संपर्क सेटअप",
+  "admin.coordinatesAddress": "निर्देशांक आणि पत्ता",
+  "admin.fullAddress": "पूर्ण पत्ता...",
+  "admin.addToDatabase": "डेटाबेसमध्ये जोडा",
+  "admin.monitorDesc": "एकाच ठिकाणी लाइव्ह क्वेर्या पहा आणि कायदेशीर केंद्रे अद्ययावत ठेवा.",
   "admin.invalidCreds": "अवैध अॅडमिन माहिती",
   "admin.checking": "प्रवेश तपासत आहोत",
   "admin.verifying": "तुमचा Firebase अॅडमिन प्रवेश पडताळत आहोत.",
@@ -345,6 +444,30 @@ const TRANSLATIONS: Partial<Record<AppLanguage, TranslationMap>> = {
   Marathi: mr,
 };
 
+const LANGUAGE_LISTENERS = new Set<() => void>();
+
+function notifyLanguageListeners() {
+  for (const listener of LANGUAGE_LISTENERS) {
+    listener();
+  }
+}
+
+function subscribeToLanguageStore(callback: () => void) {
+  LANGUAGE_LISTENERS.add(callback);
+  return () => {
+    LANGUAGE_LISTENERS.delete(callback);
+  };
+}
+
+function readStoredLanguage(): AppLanguage {
+  if (typeof window === "undefined") {
+    return "English";
+  }
+
+  const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY) as AppLanguage | null;
+  return saved && LABELS[saved] ? saved : "English";
+}
+
 interface LanguageContextValue {
   language: AppLanguage;
   setLanguage: (language: AppLanguage) => void;
@@ -356,12 +479,13 @@ interface LanguageContextValue {
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguageState] = useState<AppLanguage>(() => {
-    if (typeof window === "undefined") return "English";
-    const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY) as AppLanguage | null;
-    return saved && LABELS[saved] ? saved : "English";
-  });
   const [runtimeTranslations, setRuntimeTranslations] = useState<Partial<Record<AppLanguage, TranslationMap>>>({});
+
+  const language = useSyncExternalStore<AppLanguage>(
+    subscribeToLanguageStore,
+    readStoredLanguage,
+    () => "English",
+  );
 
   useEffect(() => {
     const shouldAutoTranslate = language !== "English" && language !== "Hindi" && language !== "Marathi";
@@ -403,8 +527,8 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }, [language, runtimeTranslations]);
 
   const setLanguage = (next: AppLanguage) => {
-    setLanguageState(next);
     localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+    notifyLanguageListeners();
   };
 
   const value = useMemo<LanguageContextValue>(() => {

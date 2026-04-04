@@ -9,7 +9,6 @@ import {
   Calendar,
   X,
 } from "lucide-react";
-import { createAppointmentDataConnect } from "@/lib/dataConnect";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -94,18 +93,26 @@ export default function ResultsPage() {
     }
 
     try {
-      const result = await createAppointmentDataConnect({
-        userId: user ? user.uid : undefined,
-        legalAidCenterId: selectedCenter!.id.toString(),
-        userName: name,
-        userContact: phone,
-        problemSummary: description,
-        preferredDate: date,
-        preferredTime: time,
-        status: "pending"
+      const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+      const response = await fetch(`${BACKEND_BASE_URL}/api/appointments/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user ? user.uid : "anonymous",
+          center_id: selectedCenter!.id.toString(),
+          center_name: selectedCenter!.name,
+          center_address: selectedCenter!.address,
+          center_phone: selectedCenter!.phone,
+          name,
+          phone,
+          issue_summary: description,
+          date,
+          time,
+          status: "pending",
+        }),
       });
 
-      if (result) {
+      if (response.ok) {
         setIsBooking(false);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 5000);
