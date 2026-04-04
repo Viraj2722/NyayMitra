@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Mic, Info, Scale } from "lucide-react";
+import { Send, Mic, Info, Scale, MapPin } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createUserQuery } from "@dataconnect/my-app";
 import { dataConnect } from "@/lib/firebase";
@@ -9,7 +9,13 @@ import { useLanguage, type AppLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 import { getUserProfileByUid, syncUserToDataConnect } from "@/lib/dataConnect";
 
-type IntakeCategory = "labor" | "domestic" | "tenancy" | "consumer" | "family" | "land";
+type IntakeCategory =
+  | "labor"
+  | "domestic"
+  | "tenancy"
+  | "consumer"
+  | "family"
+  | "land";
 
 interface Message {
   id: string;
@@ -22,7 +28,11 @@ interface SpeechRecognitionLike {
   interimResults: boolean;
   maxAlternatives: number;
   onstart: (() => void) | null;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onresult:
+    | ((event: {
+        results: ArrayLike<ArrayLike<{ transcript: string }>>;
+      }) => void)
+    | null;
   onerror: (() => void) | null;
   onend: (() => void) | null;
   start: () => void;
@@ -95,12 +105,21 @@ export default function ChatPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] = useState<IntakeCategory | null>(null);
-  const [followUpAnswer, setFollowUpAnswer] = useState<"yes" | "no" | null>(null);
+  const [selectedCategory, setSelectedCategory] =
+    useState<IntakeCategory | null>(null);
+  const [followUpAnswer, setFollowUpAnswer] = useState<"yes" | "no" | null>(
+    null,
+  );
   const [showMobilePopup, setShowMobilePopup] = useState(false);
   const [mobileInput, setMobileInput] = useState("");
   const [profileId, setProfileId] = useState<string | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [userLat, setUserLat] = useState<number | null>(null);
+  const [userLng, setUserLng] = useState<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<
+    "idle" | "loading" | "granted" | "denied" | "unsupported"
+  >("idle");
+  const [locationAsked, setLocationAsked] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -127,7 +146,10 @@ export default function ChatPage() {
 
       const profile = await getUserProfileByUid(user.uid);
       const existingMobile = profile?.mobile || "";
-      const cachedMobile = typeof window !== "undefined" ? localStorage.getItem("nyaymitra_mobile") || "" : "";
+      const cachedMobile =
+        typeof window !== "undefined"
+          ? localStorage.getItem("nyaymitra_mobile") || ""
+          : "";
       setProfileId(profile?.id || null);
 
       if (!existingMobile && cachedMobile) {
@@ -181,14 +203,48 @@ export default function ChatPage() {
     };
   }, [selectedCategory, followUpAnswer]);
 
-  const canType = Boolean(intakeContext && user && profileLoaded && !showMobilePopup);
+  const canType = Boolean(
+    intakeContext && user && profileLoaded && !showMobilePopup,
+  );
+
+  const requestUserLocation = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationStatus("unsupported");
+      return;
+    }
+
+    setLocationStatus("loading");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLat(position.coords.latitude);
+        setUserLng(position.coords.longitude);
+        setLocationStatus("granted");
+      },
+      () => {
+        setLocationStatus("denied");
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
+  useEffect(() => {
+    if (canType && !locationAsked) {
+      setLocationAsked(true);
+      requestUserLocation();
+    }
+  }, [canType, locationAsked]);
 
   const handleSaveMobile = async () => {
     if (!user) return;
 
     const cleaned = mobileInput.trim();
     if (!/^\d{10,13}$/.test(cleaned)) {
-      alert(t("chat.mobileValidation", "Please enter a valid mobile number (10 to 13 digits)"));
+      alert(
+        t(
+          "chat.mobileValidation",
+          "Please enter a valid mobile number (10 to 13 digits)",
+        ),
+      );
       return;
     }
 
@@ -207,7 +263,11 @@ export default function ChatPage() {
   const handleSend = async () => {
     if (!input.trim() || !intakeContext || !user) return;
 
-    const userMessage: Message = { id: Date.now().toString(), text: input, sender: "user" };
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: input,
+      sender: "user",
+    };
     setMessages((prev) => [...prev, userMessage]);
 
     const currentInput = input;
@@ -215,15 +275,16 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+      const BACKEND_BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
 
       const response = await fetch(`${BACKEND_BASE_URL}/api/query/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: currentInput,
-          lat: null,
-          lng: null,
+          lat: userLat,
+          lng: userLng,
           isAnonymous: false,
           userId: user.uid,
           selectedLanguage,
@@ -246,10 +307,35 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev, aiMessage]);
 
-      localStorage.setItem("nyaymitra_category", data.category || intakeContext.category);
-      localStorage.setItem("nyaymitra_centers", JSON.stringify(data.centers || []));
+      localStorage.setItem(
+        "nyaymitra_category",
+        data.category || intakeContext.category,
+      );
+      localStorage.setItem(
+        "nyaymitra_centers",
+        JSON.stringify(data.centers || []),
+      );
       localStorage.setItem("nyaymitra_urgent", String(data.urgent || false));
-      localStorage.setItem("nyaymitra_detected_lang", data.detected_language || selectedLanguage);
+      localStorage.setItem(
+        "nyaymitra_detected_lang",
+        data.detected_language || selectedLanguage,
+      );
+      localStorage.setItem(
+        "nyaymitra_rights",
+        JSON.stringify(data.rights || []),
+      );
+      localStorage.setItem(
+        "nyaymitra_next_steps",
+        JSON.stringify(data.next_steps || []),
+      );
+      localStorage.setItem(
+        "nyaymitra_emergency_numbers",
+        JSON.stringify(data.emergency_numbers || []),
+      );
+      localStorage.setItem(
+        "nyaymitra_map_search_query",
+        data.map_search_query || "",
+      );
 
       try {
         await createUserQuery(dataConnect, {
@@ -271,7 +357,10 @@ export default function ChatPage() {
       console.error("Error sending message:", error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: t("chat.processingError", "Sorry, I am having trouble processing your request. Please try again."),
+        text: t(
+          "chat.processingError",
+          "Sorry, I am having trouble processing your request. Please try again.",
+        ),
         sender: "ai",
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -291,13 +380,25 @@ export default function ChatPage() {
   };
 
   const startRecording = () => {
-    const SpeechRecognition = ((window as Window & {
-      SpeechRecognition?: SpeechRecognitionConstructor;
-      webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    }).SpeechRecognition ||
-      (window as Window & { webkitSpeechRecognition?: SpeechRecognitionConstructor }).webkitSpeechRecognition);
+    const SpeechRecognition =
+      (
+        window as Window & {
+          SpeechRecognition?: SpeechRecognitionConstructor;
+          webkitSpeechRecognition?: SpeechRecognitionConstructor;
+        }
+      ).SpeechRecognition ||
+      (
+        window as Window & {
+          webkitSpeechRecognition?: SpeechRecognitionConstructor;
+        }
+      ).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(t("chat.speechUnsupported", "Speech recognition is not supported in this browser. Please use Chrome."));
+      alert(
+        t(
+          "chat.speechUnsupported",
+          "Speech recognition is not supported in this browser. Please use Chrome.",
+        ),
+      );
       return;
     }
 
@@ -320,7 +421,9 @@ export default function ChatPage() {
   if (loading || !user) {
     return (
       <div className="flex-1 flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <p className="text-sm text-gray-600 dark:text-gray-300">{t("chat.signInRequired", "Please sign in to access chat...")}</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          {t("chat.signInRequired", "Please sign in to access chat...")}
+        </p>
       </div>
     );
   }
@@ -330,9 +433,14 @@ export default function ChatPage() {
       {showMobilePopup && (
         <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-6 space-y-4">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t("chat.addMobileTitle", "Add mobile number")}</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+              {t("chat.addMobileTitle", "Add mobile number")}
+            </h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              {t("chat.addMobileSubtitle", "Please add your mobile number before starting chat. We save it in your Data Connect profile.")}
+              {t(
+                "chat.addMobileSubtitle",
+                "Please add your mobile number before starting chat. We save it in your Data Connect profile.",
+              )}
             </p>
             <input
               value={mobileInput}
@@ -356,7 +464,9 @@ export default function ChatPage() {
             <Scale className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg leading-tight text-white">NyayMitra Assistant</h2>
+            <h2 className="font-semibold text-lg leading-tight text-white">
+              NyayMitra Assistant
+            </h2>
             <p className="text-xs text-blue-100/90 dark:text-gray-400">
               {`${t("chat.language", "Language")}: ${LANG_META[selectedLanguage].label}`}
             </p>
@@ -369,13 +479,18 @@ export default function ChatPage() {
 
         <div className="text-center mb-2">
           <span className="bg-[#D9FDD3]/70 dark:bg-[#182229] text-xs text-gray-700 dark:text-[#8696a0] px-3 py-1.5 rounded-lg shadow-sm font-medium">
-            {t("chat.privacy", "Your conversations are private and protected by NyayMitra")}
+            {t(
+              "chat.privacy",
+              "Your conversations are private and protected by NyayMitra",
+            )}
           </span>
         </div>
 
         {selectedLanguage && !selectedCategory && (
           <div className="bg-white dark:bg-[#202c33] rounded-2xl p-4 border border-gray-100 dark:border-zinc-700 shadow-sm space-y-3">
-            <p className="font-semibold text-gray-900 dark:text-white">{t("chat.selectIssue", "Select your issue type first:")}</p>
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {t("chat.selectIssue", "Select your issue type first:")}
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {(Object.keys(INTAKE_FLOW) as IntakeCategory[]).map((key) => (
                 <button
@@ -392,7 +507,12 @@ export default function ChatPage() {
 
         {selectedCategory && !followUpAnswer && (
           <div className="bg-white dark:bg-[#202c33] rounded-2xl p-4 border border-gray-100 dark:border-zinc-700 shadow-sm space-y-3">
-            <p className="font-semibold text-gray-900 dark:text-white">{t(`intake.${selectedCategory}.question`, INTAKE_FLOW[selectedCategory].followUpQuestion)}</p>
+            <p className="font-semibold text-gray-900 dark:text-white">
+              {t(
+                `intake.${selectedCategory}.question`,
+                INTAKE_FLOW[selectedCategory].followUpQuestion,
+              )}
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setFollowUpAnswer("yes")}
@@ -411,7 +531,10 @@ export default function ChatPage() {
         )}
 
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} w-full`}>
+          <div
+            key={msg.id}
+            className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} w-full`}
+          >
             <div
               className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2.5 text-[15px] shadow-sm relative leading-relaxed ${
                 msg.sender === "user"
@@ -437,6 +560,27 @@ export default function ChatPage() {
       </div>
 
       <div className="bg-[#f0f2f5] dark:bg-[#202c33] p-3 flex items-end gap-2 z-10 shrink-0">
+        {canType && locationStatus !== "granted" && (
+          <div className="absolute bottom-24 left-3 right-3 md:left-6 md:right-6 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2 text-amber-800">
+              <MapPin className="w-4 h-4" />
+              <span>
+                {locationStatus === "loading"
+                  ? "Detecting your location..."
+                  : "Share location to find nearest legal center/advocate."}
+              </span>
+            </div>
+            {locationStatus !== "loading" && (
+              <button
+                onClick={requestUserLocation}
+                className="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold"
+              >
+                Allow
+              </button>
+            )}
+          </div>
+        )}
+
         <button className="p-3 text-gray-500 dark:text-[#8696a0] hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
           <Info className="w-6 h-6" />
         </button>
@@ -450,7 +594,10 @@ export default function ChatPage() {
             placeholder={
               canType
                 ? `Type your problem in ${selectedLanguage}...`
-                : t("chat.completeIntake", "Complete language + intake questions first")
+                : t(
+                    "chat.completeIntake",
+                    "Complete language + intake questions first",
+                  )
             }
             className="flex-1 max-h-32 min-h-[24px] bg-transparent resize-none outline-none py-2 px-3 text-[15px] text-gray-800 dark:text-[#e9edef] placeholder-gray-400 dark:placeholder-[#8696a0] disabled:opacity-60"
             rows={1}

@@ -13,10 +13,20 @@
 
 import { app } from "@/lib/firebase";
 import { getDataConnect } from "firebase/data-connect";
-import { createAppointment, connectorConfig, createUser, getUserByUid, upsertUserProfile } from "@/lib/dataconnect-generated";
+import {
+  createAppointmentWithCenter,
+  connectorConfig,
+  createLegalAidCenter,
+  createUser,
+  getUserByUid,
+  upsertUserProfile,
+} from "@/lib/dataconnect-generated";
 
 // Initialize Data Connect using the officially generated Connector Config
 const dataConnect = getDataConnect(app, connectorConfig);
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export interface User {
   id?: string;
@@ -54,6 +64,12 @@ export interface UserQuery {
 export interface AppointmentInput {
   userId?: string;
   legalAidCenterId: string;
+  centerName?: string;
+  centerAddress?: string;
+  centerPhone?: string;
+  centerLatitude?: number;
+  centerLongitude?: number;
+  centerCategories?: string[];
   userName: string;
   userContact: string;
   problemSummary: string;
@@ -111,11 +127,55 @@ export const syncUserToDataConnect = async (user: User) => {
 export const createAppointmentDataConnect = async (appointment: AppointmentInput) => {
   console.log("🟢 [Data Connect] Saving Appointment:", appointment);
   try {
-    await createAppointment(dataConnect, {
+    let legalAidCenterId = appointment.legalAidCenterId;
+    const isUuid = UUID_REGEX.test(legalAidCenterId);
+    let dataConnectUserId: string | null = null;
+
+    if (appointment.userId) {
+      if (UUID_REGEX.test(appointment.userId)) {
+        dataConnectUserId = appointment.userId;
+      } else if (appointment.userId !== "anonymous") {
+        try {
+          const userLookup = await getUserByUid(dataConnect, { uid: appointment.userId });
+          dataConnectUserId = userLookup?.data?.users?.[0]?.id || null;
+        } catch (lookupError) {
+          console.warn("⚠️ Could not resolve Data Connect user ID from UID:", lookupError);
+        }
+      }
+    }
+
+    // If center ID is not a Data Connect UUID, create a center in Data Connect first.
+    if (!isUuid) {
+      const centerInsert = await createLegalAidCenter(dataConnect, {
+        name: appointment.centerName || "Legal Aid Center",
+        address: appointment.centerAddress || "Address not available",
+        phone: appointment.centerPhone || "0000000000",
+        latitude: Number.isFinite(appointment.centerLatitude)
+          ? Number(appointment.centerLatitude)
+          : 0,
+        longitude: Number.isFinite(appointment.centerLongitude)
+          ? Number(appointment.centerLongitude)
+          : 0,
+        freeServices: true,
+        categories:
+          appointment.centerCategories && appointment.centerCategories.length > 0
+            ? appointment.centerCategories
+            : ["general"],
+        timings: "Mon-Sat 10AM-5PM",
+        description: "Auto-synced from NyayMitra booking flow",
+      });
+
+      legalAidCenterId = centerInsert?.data?.legalAidCenter_insert?.id || legalAidCenterId;
+    }
+
+    await createAppointmentWithCenter(dataConnect, {
+      userId: dataConnectUserId,
+      legalAidCenterId,
       userName: appointment.userName,
       userContact: appointment.userContact,
       problemSummary: appointment.problemSummary,
       preferredDate: appointment.preferredDate,
+      preferredTime: appointment.preferredTime || null,
       status: appointment.status || "pending"
     });
     console.log("✅ Appointment created successfully");

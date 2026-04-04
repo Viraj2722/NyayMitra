@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from services.ai_service import generate_response, classify_category
+from services.ai_service import generate_analytical_response
 from services.translation_service import detect_language, translate_to_english, translate_text
 from services.matching_service import get_nearest_centers
 from utils.urgency_detector import detect_urgency
@@ -94,14 +94,19 @@ def handle_query():
     translated = translate_to_english(user_input)
 
     # Step 3: AI response with hard language lock + intake context
-    ai_response = generate_response(user_input, selected_language, intake_context)
+    ai_json = generate_analytical_response(translated, selected_language, intake_context)
+    ai_response = ai_json.get("response", "")
 
     # Step 4: Urgency detection
     urgent = detect_urgency(user_input)
 
     # Step 5: Category from intake if available, else AI classification
     category_from_intake = intake_context.get("category") if isinstance(intake_context, dict) else None
-    category = category_from_intake or classify_category(translated)
+    category = category_from_intake or ai_json.get("category", "general")
+    rights = ai_json.get("rights", [])
+    next_steps = ai_json.get("next_steps", [])
+    emergency_numbers = ai_json.get("emergency_numbers", [])
+    map_search_query = ai_json.get("map_search_query", "Nearest Legal Aid Clinic")
 
     # Step 6: Find centers
     # If no lat/lng, we still return top centers based on category
@@ -136,6 +141,10 @@ def handle_query():
         "category": category,
         "urgent": urgent,
         "centers": centers,
+        "rights": rights,
+        "next_steps": next_steps,
+        "emergency_numbers": emergency_numbers,
+        "map_search_query": map_search_query,
         "detected_language": lang,
         "selected_language": selected_language,
         "intake_context": intake_context

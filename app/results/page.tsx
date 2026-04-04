@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { createAppointmentDataConnect } from "@/lib/dataConnect";
 
 type Center = {
   id: string;
@@ -21,6 +22,59 @@ type Center = {
   distance?: number;
   latitude?: number;
   longitude?: number;
+};
+
+type RightCard = {
+  title: string;
+  desc: string;
+};
+
+type StepItem = {
+  title: string;
+  desc: string;
+};
+
+type EmergencyNumber = {
+  name: string;
+  number: string;
+};
+
+const normalizeRights = (raw: unknown): RightCard[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === "string") {
+        return { title: item, desc: "" };
+      }
+      if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        const title = String(obj.title ?? obj.right ?? obj.name ?? "").trim();
+        const desc = String(obj.desc ?? obj.description ?? obj.detail ?? "").trim();
+        if (!title && !desc) return null;
+        return { title: title || "Legal Right", desc };
+      }
+      return null;
+    })
+    .filter((item): item is RightCard => Boolean(item));
+};
+
+const normalizeSteps = (raw: unknown): StepItem[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === "string") {
+        return { title: item, desc: "" };
+      }
+      if (item && typeof item === "object") {
+        const obj = item as Record<string, unknown>;
+        const title = String(obj.title ?? obj.step ?? obj.action ?? "").trim();
+        const desc = String(obj.desc ?? obj.description ?? obj.detail ?? "").trim();
+        if (!title && !desc) return null;
+        return { title: title || "Step", desc };
+      }
+      return null;
+    })
+    .filter((item): item is StepItem => Boolean(item));
 };
 
 export default function ResultsPage() {
@@ -34,6 +88,36 @@ export default function ResultsPage() {
   const [loadingCenters, setLoadingCenters] = useState(true);
   const [urgency, setUrgency] = useState<string>("normal");
   const [category, setCategory] = useState<string>(t("common.loading", "Loading..."));
+  const [rights, setRights] = useState<RightCard[]>([
+    {
+      title: t("results.right1.title", "Right to Wages"),
+      desc: t("results.right1.desc", "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act."),
+    },
+    {
+      title: t("results.right2.title", "Protection from Unfair Dismissal"),
+      desc: t("results.right2.desc", "An employer must provide proper notice before termination under the Industrial Disputes Act."),
+    },
+    {
+      title: t("results.right3.title", "Right to Free Legal Aid"),
+      desc: t("results.right3.desc", "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation."),
+    },
+  ]);
+  const [nextSteps, setNextSteps] = useState<StepItem[]>([
+    {
+      title: t("results.gatherEvidence", "Gather Evidence"),
+      desc: t("results.gatherEvidenceDesc", "Collect all employment contracts, ID cards, and WhatsApp messages with your employer."),
+    },
+    {
+      title: t("results.draftComplaint", "Draft a Complaint"),
+      desc: t("results.draftComplaintDesc", "Write a simple timeline of events in your preferred language."),
+    },
+    {
+      title: t("results.visitCenter", "Visit a Free Center"),
+      desc: t("results.visitCenterDesc", "Book an appointment or walk into a Legal Aid center listed below."),
+    },
+  ]);
+  const [emergencyNumbers, setEmergencyNumbers] = useState<EmergencyNumber[]>([]);
+  const [mapSearchQuery, setMapSearchQuery] = useState<string>("");
   const { user } = useAuth();
 
   useEffect(() => {
@@ -59,6 +143,42 @@ export default function ResultsPage() {
             distance: 2.5,
           },
         ]);
+      }
+
+      const storedRights = localStorage.getItem("nyaymitra_rights");
+      if (storedRights) {
+        const parsedRights = normalizeRights(JSON.parse(storedRights));
+        if (parsedRights.length > 0) {
+          setRights(parsedRights);
+        }
+      }
+
+      const storedSteps = localStorage.getItem("nyaymitra_next_steps");
+      if (storedSteps) {
+        const parsedSteps = normalizeSteps(JSON.parse(storedSteps));
+        if (parsedSteps.length > 0) {
+          setNextSteps(parsedSteps);
+        }
+      }
+
+      const storedEmergency = localStorage.getItem("nyaymitra_emergency_numbers");
+      if (storedEmergency) {
+        const parsedEmergency = JSON.parse(storedEmergency);
+        if (Array.isArray(parsedEmergency)) {
+          setEmergencyNumbers(parsedEmergency);
+        }
+      }
+
+      const storedMapQuery = localStorage.getItem("nyaymitra_map_search_query");
+      if (storedMapQuery && storedMapQuery.trim().length > 0) {
+        setMapSearchQuery(storedMapQuery);
+      } else if (storedCategory && storedCategory.trim().length > 0) {
+        setMapSearchQuery(`Nearest ${storedCategory} legal aid center`);
+      } else if (storedCenters) {
+        const parsedCenters = JSON.parse(storedCenters);
+        if (Array.isArray(parsedCenters) && parsedCenters[0]?.name) {
+          setMapSearchQuery(parsedCenters[0].name);
+        }
       }
     } catch (error) {
       console.error("Error loading legal centers from storage", error);
@@ -93,26 +213,24 @@ export default function ResultsPage() {
     }
 
     try {
-      const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
-      const response = await fetch(`${BACKEND_BASE_URL}/api/appointments/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user_id: user ? user.uid : "anonymous",
-          center_id: selectedCenter!.id.toString(),
-          center_name: selectedCenter!.name,
-          center_address: selectedCenter!.address,
-          center_phone: selectedCenter!.phone,
-          name,
-          phone,
-          issue_summary: description,
-          date,
-          time,
-          status: "pending",
-        }),
+      const saved = await createAppointmentDataConnect({
+        userId: user ? user.uid : "anonymous",
+        legalAidCenterId: selectedCenter!.id,
+        centerName: selectedCenter!.name,
+        centerAddress: selectedCenter!.address,
+        centerPhone: selectedCenter!.phone,
+        centerLatitude: selectedCenter!.latitude,
+        centerLongitude: selectedCenter!.longitude,
+        centerCategories: selectedCenter!.categories,
+        userName: name,
+        userContact: phone,
+        problemSummary: description,
+        preferredDate: date,
+        preferredTime: time,
+        status: "pending",
       });
 
-      if (response.ok) {
+      if (saved) {
         setIsBooking(false);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 5000);
@@ -163,20 +281,7 @@ export default function ResultsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              {
-                title: t("results.right1.title", "Right to Wages"),
-                desc: t("results.right1.desc", "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act."),
-              },
-              {
-                title: t("results.right2.title", "Protection from Unfair Dismissal"),
-                desc: t("results.right2.desc", "An employer must provide proper notice before termination under the Industrial Disputes Act."),
-              },
-              {
-                title: t("results.right3.title", "Right to Free Legal Aid"),
-                desc: t("results.right3.desc", "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation."),
-              },
-            ].map((right, i) => (
+            {rights.map((right, i) => (
               <div
                 key={i}
                 className="bg-white rounded-xl p-6 shadow-sm border border-orange-100 opacity-0 relative overflow-hidden group"
@@ -205,33 +310,15 @@ export default function ResultsPage() {
               <h2 className="text-2xl font-bold text-gray-800">{t("results.nextSteps", "Next Steps")}</h2>
             </div>
             <ol className="space-y-6 relative border-l-2 border-blue-100 ml-3">
-              <li className="pl-6 relative">
-                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
-                  1
-                </span>
-                <h4 className="font-bold text-gray-800">{t("results.gatherEvidence", "Gather Evidence")}</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  {t("results.gatherEvidenceDesc", "Collect all employment contracts, ID cards, and WhatsApp messages with your employer.")}
-                </p>
-              </li>
-              <li className="pl-6 relative">
-                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
-                  2
-                </span>
-                <h4 className="font-bold text-gray-800">{t("results.draftComplaint", "Draft a Complaint")}</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  {t("results.draftComplaintDesc", "Write a simple timeline of events in your preferred language.")}
-                </p>
-              </li>
-              <li className="pl-6 relative">
-                <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
-                  3
-                </span>
-                <h4 className="font-bold text-gray-800">{t("results.visitCenter", "Visit a Free Center")}</h4>
-                <p className="text-sm text-gray-600 mt-1">
-                  {t("results.visitCenterDesc", "Book an appointment or walk into a Legal Aid center listed below.")}
-                </p>
-              </li>
+              {nextSteps.map((step, index) => (
+                <li key={`${step.title}-${index}`} className="pl-6 relative">
+                  <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
+                    {index + 1}
+                  </span>
+                  <h4 className="font-bold text-gray-800">{step.title}</h4>
+                  <p className="text-sm text-gray-600 mt-1">{step.desc}</p>
+                </li>
+              ))}
             </ol>
           </div>
 
@@ -252,9 +339,27 @@ export default function ResultsPage() {
                 scrolling="no"
                 marginHeight={0}
                 marginWidth={0}
-                src="https://maps.google.com/maps?width=100%25&amp;height=600&amp;hl=en&amp;q=Mumbai+Courts+(Legal+Centers)&amp;t=&amp;z=11&amp;ie=UTF8&amp;iwloc=B&amp;output=embed"
+                src={`https://maps.google.com/maps?width=100%25&height=600&hl=en&q=${encodeURIComponent(mapSearchQuery || "Nearby Legal Aid Center")}&t=&z=11&ie=UTF8&iwloc=B&output=embed`}
               ></iframe>
             </div>
+
+            {emergencyNumbers.length > 0 && (
+              <div className="mb-4 bg-red-50 border border-red-100 rounded-xl p-3">
+                <p className="text-sm font-semibold text-red-700 mb-2">Emergency Numbers</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {emergencyNumbers.map((item) => (
+                    <a
+                      key={`${item.name}-${item.number}`}
+                      href={`tel:${item.number}`}
+                      className="text-sm bg-white px-3 py-2 rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
+                    >
+                      <span className="font-medium text-gray-800">{item.name}</span>
+                      <span className="text-red-700 ml-2">{item.number}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               {loadingCenters && (
