@@ -9,6 +9,26 @@ import datetime
 query_bp = Blueprint("query", __name__)
 
 
+LOCALIZED_FALLBACK_RESPONSE = {
+    "English": "I understood your issue and prepared guidance for {category}.",
+    "Hindi": "मैंने आपकी समस्या समझ ली है और {category} के लिए मार्गदर्शन तैयार किया है।",
+    "Marathi": "मी तुमची समस्या समजून घेतली आहे आणि {category} साठी मार्गदर्शन तयार केले आहे.",
+    "Bengali": "আমি আপনার সমস্যা বুঝেছি এবং {category} এর জন্য নির্দেশনা প্রস্তুত করেছি।",
+    "Gujarati": "મેં તમારી સમસ્યા સમજી લીધી છે અને {category} માટે માર્ગદર્શન તૈયાર કર્યું છે.",
+    "Tamil": "நான் உங்கள் பிரச்சினையைப் புரிந்துகொண்டேன், {category} க்கான வழிகாட்டுதலைத் தயார் செய்துள்ளேன்.",
+    "Telugu": "నేను మీ సమస్యను అర్థం చేసుకున్నాను మరియు {category} కోసం మార్గదర్శకాన్ని సిద్ధం చేశాను.",
+    "Kannada": "ನಾನು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ಅರ್ಥಮಾಡಿಕೊಂಡಿದ್ದೇನೆ ಮತ್ತು {category}ಗಾಗಿ ಮಾರ್ಗದರ್ಶನವನ್ನು ತಯಾರಿಸಿದ್ದೇನೆ.",
+    "Malayalam": "ഞാൻ നിങ്ങളുടെ പ്രശ്നം മനസ്സിലാക്കി, {category}യ്ക്കായി മാർഗനിർദേശം തയ്യാറാക്കി.",
+    "Punjabi": "ਮੈਂ ਤੁਹਾਡੀ ਸਮੱਸਿਆ ਸਮਝ ਲਈ ਹੈ ਅਤੇ {category} ਲਈ ਮਾਰਗਦਰਸ਼ਨ ਤਿਆਰ ਕੀਤਾ ਹੈ।",
+    "Urdu": "میں نے آپ کا مسئلہ سمجھ لیا ہے اور {category} کے لیے رہنمائی تیار کی ہے۔",
+}
+
+
+def _localized_response_template(selected_language, category):
+    template = LOCALIZED_FALLBACK_RESPONSE.get(selected_language, LOCALIZED_FALLBACK_RESPONSE["English"])
+    return template.format(category=category or "general")
+
+
 def _serialize_query(doc):
     data = doc.to_dict() or {}
     created_at = data.get("created_at")
@@ -95,7 +115,7 @@ def handle_query():
 
     # Step 3: AI response with hard language lock + intake context
     ai_json = generate_analytical_response(translated, selected_language, intake_context)
-    ai_response = ai_json.get("response", "")
+    ai_response = (ai_json.get("response") or "").strip()
 
     # Step 4: Urgency detection
     urgent = detect_urgency(user_input)
@@ -107,6 +127,9 @@ def handle_query():
     next_steps = ai_json.get("next_steps", [])
     emergency_numbers = ai_json.get("emergency_numbers", [])
     map_search_query = ai_json.get("map_search_query", "Nearest Legal Aid Clinic")
+
+    if not ai_response:
+        ai_response = _localized_response_template(selected_language, category)
 
     # Step 6: Find centers
     # If no lat/lng, we still return top centers based on category

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { Shield } from "lucide-react";
+import type { FirebaseError } from "firebase/app";
 
 const ADMIN_EMAIL = "admin@example.com";
 
@@ -18,16 +19,69 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [retrySeconds, setRetrySeconds] = useState(0);
+
+  const getReadableLoginError = (errorValue: unknown): string => {
+    const code = (errorValue as FirebaseError | undefined)?.code || "";
+
+    if (code === "auth/invalid-credential") {
+      return t(
+        "auth.invalidCredential",
+        "Invalid email or password. If this account was created in another Firebase project, use the correct project credentials.",
+      );
+    }
+
+    if (code === "auth/user-not-found") {
+      return t("auth.userNotFound", "No account found with this email. Please sign up first.");
+    }
+
+    if (code === "auth/wrong-password") {
+      return t("auth.wrongPassword", "Incorrect password. Please try again.");
+    }
+
+    if (code === "auth/too-many-requests") {
+      return t(
+        "auth.tooManyRequests",
+        "Too many attempts. Please wait a little and try again, or reset your password.",
+      );
+    }
+
+    if (code === "auth/network-request-failed") {
+      return t("auth.networkFail", "Network error. Check your internet and try again.");
+    }
+
+    return t("auth.loginFailed", "Failed to sign in. Please check your credentials.");
+  };
+
+  const startRetryCooldown = (seconds: number) => {
+    setRetrySeconds(seconds);
+    const timer = window.setInterval(() => {
+      setRetrySeconds((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (retrySeconds > 0) return;
+
     setError("");
     setIsLoading(true);
     try {
-      await signInWithEmail(email, password);
-      router.push(email.toLowerCase() === ADMIN_EMAIL ? "/admin" : "/");
-    } catch {
-      setError(t("auth.loginFailed", "Failed to sign in. Please check your credentials."));
+      const normalizedEmail = email.trim().toLowerCase();
+      await signInWithEmail(normalizedEmail, password);
+      router.push(normalizedEmail === ADMIN_EMAIL ? "/admin" : "/");
+    } catch (err) {
+      const code = (err as FirebaseError | undefined)?.code || "";
+      setError(getReadableLoginError(err));
+      if (code === "auth/too-many-requests") {
+        startRetryCooldown(45);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -86,10 +140,14 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isLoading || retrySeconds > 0}
             className="w-full bg-[var(--color-deep-blue)] hover:bg-blue-900 text-white font-bold py-2 rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100 mt-2 text-sm"
           >
-            {isLoading ? t("auth.signingIn", "Signing in...") : t("auth.signIn", "Sign In")}
+            {isLoading
+              ? t("auth.signingIn", "Signing in...")
+              : retrySeconds > 0
+                ? `${t("auth.retryIn", "Try again in")} ${retrySeconds}s`
+                : t("auth.signIn", "Sign In")}
           </button>
         </form>
 

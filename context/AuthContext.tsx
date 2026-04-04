@@ -99,7 +99,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signInWithEmail = async (email: string, password: string) => {
     try {
-      const result = await signInWithEmailAndPassword(auth, email, password);
+      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedPassword = password;
+      const result = await signInWithEmailAndPassword(auth, normalizedEmail, normalizedPassword);
       setUser(result.user);
       setIsAdmin(result.user.email === ADMIN_EMAIL);
     } catch (error) {

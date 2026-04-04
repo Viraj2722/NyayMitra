@@ -86,6 +86,45 @@ const INTAKE_FLOW: Record<
   },
 };
 
+const LOCALIZED_FALLBACK_RESPONSE: Record<AppLanguage, (category: string) => string> = {
+  English: (category) => `I understood your issue and prepared guidance for ${category}.`,
+  Hindi: (category) => `मैंने आपकी समस्या समझ ली है और ${category} के लिए मार्गदर्शन तैयार किया है।`,
+  Marathi: (category) => `मी तुमची समस्या समजून घेतली आहे आणि ${category} साठी मार्गदर्शन तयार केले आहे.`,
+  Bengali: (category) => `আমি আপনার সমস্যা বুঝেছি এবং ${category} এর জন্য নির্দেশনা প্রস্তুত করেছি।`,
+  Gujarati: (category) => `મેં તમારી સમસ્યા સમજી લીધી છે અને ${category} માટે માર્ગદર્શન તૈયાર કર્યું છે.`,
+  Tamil: (category) => `நான் உங்கள் பிரச்சினையைப் புரிந்துகொண்டேன், ${category} க்கான வழிகாட்டுதலைத் தயார் செய்துள்ளேன்.`,
+  Telugu: (category) => `నేను మీ సమస్యను అర్థం చేసుకున్నాను మరియు ${category} కోసం మార్గదర్శకాన్ని సిద్ధం చేశాను.`,
+  Kannada: (category) => `ನಾನು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ಅರ್ಥಮಾಡಿಕೊಂಡಿದ್ದೇನೆ ಮತ್ತು ${category}ಗಾಗಿ ಮಾರ್ಗದರ್ಶನವನ್ನು ತಯಾರಿಸಿದ್ದೇನೆ.`,
+  Malayalam: (category) => `ഞാൻ നിങ്ങളുടെ പ്രശ്നം മനസ്സിലാക്കി, ${category}യ്ക്കായി മാർഗനിർദേശം തയ്യാറാക്കി.`,
+  Punjabi: (category) => `ਮੈਂ ਤੁਹਾਡੀ ਸਮੱਸਿਆ ਸਮਝ ਲਈ ਹੈ ਅਤੇ ${category} ਲਈ ਮਾਰਗਦਰਸ਼ਨ ਤਿਆਰ ਕੀਤਾ ਹੈ।`,
+  Urdu: (category) => `میں نے آپ کا مسئلہ سمجھ لیا ہے اور ${category} کے لیے رہنمائی تیار کی ہے۔`,
+};
+
+const RESULTS_BUTTON_LABELS: Record<AppLanguage, string> = {
+  English: "View Results",
+  Hindi: "परिणाम देखें",
+  Marathi: "निकाल पहा",
+  Bengali: "ফলাফল দেখুন",
+  Gujarati: "પરિણામ જુઓ",
+  Tamil: "முடிவுகளைப் பார்க்கவும்",
+  Telugu: "ఫలితాలను చూడండి",
+  Kannada: "ಫಲಿತಾಂಶಗಳನ್ನು ನೋಡಿ",
+  Malayalam: "ഫലങ്ങൾ കാണുക",
+  Punjabi: "ਨਤੀਜੇ ਵੇਖੋ",
+  Urdu: "نتائج دیکھیں",
+};
+
+const CHAT_SESSION_KEY = "nyaymitra_chat_session";
+
+type ChatSessionState = {
+  messages: Message[];
+  selectedCategory: IntakeCategory | null;
+  followUpAnswer: "yes" | "no" | null;
+  selectedLanguage: AppLanguage;
+  userLat: number | null;
+  userLng: number | null;
+};
+
 function getLanguageGreeting(language: AppLanguage): string {
   if (language === "Hindi") {
     return "नमस्ते। मैं आपका कानूनी सहायक हूं। पहले नीचे दिए गए विकल्प चुनें, फिर अपनी समस्या लिखें।";
@@ -120,11 +159,36 @@ export default function ChatPage() {
     "idle" | "loading" | "granted" | "denied" | "unsupported"
   >("idle");
   const [locationAsked, setLocationAsked] = useState(false);
+  const [hasInitializedSession, setHasInitializedSession] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      const storedSession = sessionStorage.getItem(CHAT_SESSION_KEY);
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession) as Partial<ChatSessionState>;
+        if (parsed.selectedLanguage === selectedLanguage && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+          setMessages(parsed.messages);
+          setSelectedCategory(parsed.selectedCategory ?? null);
+          setFollowUpAnswer(parsed.followUpAnswer ?? null);
+          if (typeof parsed.userLat === "number") {
+            setUserLat(parsed.userLat);
+          }
+          if (typeof parsed.userLng === "number") {
+            setUserLng(parsed.userLng);
+          }
+          setHasInitializedSession(true);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("Failed to restore chat session", error);
+    }
+
     setMessages([
       {
         id: "1",
@@ -132,6 +196,9 @@ export default function ChatPage() {
         sender: "ai",
       },
     ]);
+    setSelectedCategory(null);
+    setFollowUpAnswer(null);
+    setHasInitializedSession(true);
   }, [selectedLanguage]);
 
   useEffect(() => {
@@ -188,6 +255,21 @@ export default function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!hasInitializedSession || typeof window === "undefined") return;
+
+    const sessionState: ChatSessionState = {
+      messages,
+      selectedCategory,
+      followUpAnswer,
+      selectedLanguage,
+      userLat,
+      userLng,
+    };
+
+    sessionStorage.setItem(CHAT_SESSION_KEY, JSON.stringify(sessionState));
+  }, [messages, selectedCategory, followUpAnswer, selectedLanguage, hasInitializedSession]);
 
   const speechLang = useMemo(() => {
     if (!selectedLanguage) return "en-IN";
@@ -299,9 +381,7 @@ export default function ChatPage() {
       const data = await response.json();
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text:
-          data.response ||
-          `I understood your issue and prepared guidance for ${data.category || "general"}.`,
+        text: data.response || LOCALIZED_FALLBACK_RESPONSE[selectedLanguage](data.category || "general"),
         sender: "ai",
       };
 
@@ -366,9 +446,6 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
-      setTimeout(() => {
-        router.push("/results");
-      }, 2000);
     }
   };
 
@@ -417,6 +494,13 @@ export default function ChatPage() {
 
     recognition.start();
   };
+
+  const handleOpenResults = () => {
+    router.push("/results");
+  };
+
+  const showResultsButton =
+    messages.length > 1 && messages[messages.length - 1]?.sender === "ai" && !isLoading;
 
   if (loading || !user) {
     return (
@@ -546,6 +630,17 @@ export default function ChatPage() {
             </div>
           </div>
         ))}
+
+        {showResultsButton && (
+          <div className="flex justify-center w-full pt-2 pb-1">
+            <button
+              onClick={handleOpenResults}
+              className="px-5 py-2.5 rounded-full bg-[var(--color-deep-blue)] text-white font-semibold shadow-md hover:brightness-110 transition-colors"
+            >
+              {RESULTS_BUTTON_LABELS[selectedLanguage]}
+            </button>
+          </div>
+        )}
 
         {isLoading && (
           <div className="flex justify-start w-full">

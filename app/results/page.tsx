@@ -22,6 +22,15 @@ type Center = {
   distance?: number;
   latitude?: number;
   longitude?: number;
+  lat?: number;
+  lng?: number;
+  freeServices?: boolean;
+  source?: string;
+};
+
+type UserLocation = {
+  lat: number;
+  lng: number;
 };
 
 type RightCard = {
@@ -38,6 +47,16 @@ type EmergencyNumber = {
   name: string;
   number: string;
 };
+
+type SafetyStatus = "unknown" | "safe" | "unsafe";
+
+const SAFETY_STATUS_KEY = "nyaymitra_safety_status";
+
+const DEFAULT_EMERGENCY_NUMBERS: EmergencyNumber[] = [
+  { name: "National Emergency", number: "112" },
+  { name: "Women Helpline", number: "181" },
+  { name: "Police", number: "100" },
+];
 
 const normalizeRights = (raw: unknown): RightCard[] => {
   if (!Array.isArray(raw)) return [];
@@ -75,6 +94,122 @@ const normalizeSteps = (raw: unknown): StepItem[] => {
       return null;
     })
     .filter((item): item is StepItem => Boolean(item));
+};
+
+const BACKEND_BASE_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+
+const toNumber = (value: unknown): number | undefined => {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const normalizeCenter = (raw: unknown): Center | null => {
+  if (!raw || typeof raw !== "object") return null;
+
+  const obj = raw as Record<string, unknown>;
+  const latitude = toNumber(obj.latitude ?? obj.lat);
+  const longitude = toNumber(obj.longitude ?? obj.lng);
+  const name = String(obj.name ?? "").trim();
+  const address = String(obj.address ?? "").trim();
+  const phone = String(obj.phone ?? "").trim();
+  const id = String(obj.id ?? `${name}-${address}-${phone}`).trim();
+
+  if (!id || !name) return null;
+
+  const categories = Array.isArray(obj.categories)
+    ? obj.categories.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+
+  return {
+    id,
+    name,
+    address,
+    phone,
+    categories,
+    distance: toNumber(obj.distance),
+    latitude,
+    longitude,
+    lat: latitude,
+    lng: longitude,
+    freeServices: typeof obj.freeServices === "boolean" ? obj.freeServices : undefined,
+    source: typeof obj.source === "string" ? obj.source : undefined,
+  };
+};
+
+const normalizeCenterList = (raw: unknown): Center[] => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map(normalizeCenter)
+    .filter((item): item is Center => Boolean(item));
+};
+
+const normalizeEmergencyNumbers = (raw: unknown): EmergencyNumber[] => {
+  if (!Array.isArray(raw)) return [];
+
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const obj = item as Record<string, unknown>;
+      const name = String(obj.name ?? obj.title ?? obj.label ?? "").trim();
+      const number = String(obj.number ?? obj.phone ?? obj.contact ?? "").trim();
+
+      if (!number) return null;
+
+      return {
+        name: name || "Emergency",
+        number,
+      };
+    })
+    .filter((item): item is EmergencyNumber => Boolean(item));
+};
+
+const haversineKm = (from: UserLocation, to: UserLocation): number => {
+  const radiusKm = 6371;
+  const lat1 = (from.lat * Math.PI) / 180;
+  const lng1 = (from.lng * Math.PI) / 180;
+  const lat2 = (to.lat * Math.PI) / 180;
+  const lng2 = (to.lng * Math.PI) / 180;
+  const deltaLat = lat2 - lat1;
+  const deltaLng = lng2 - lng1;
+  const a =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(deltaLng / 2) ** 2;
+  return radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const parseUserLocation = (raw: string | null): UserLocation | null => {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as { userLat?: unknown; userLng?: unknown };
+    const lat = toNumber(parsed.userLat);
+    const lng = toNumber(parsed.userLng);
+    if (typeof lat === "number" && typeof lng === "number") {
+      return { lat, lng };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const buildMapsQuery = (center: Center | null, userLocation: UserLocation | null): string => {
+  if (center?.latitude != null && center?.longitude != null) {
+    return `${center.latitude},${center.longitude}`;
+  }
+
+  if (center?.name) {
+    return center.name;
+  }
+
+  if (userLocation) {
+    return `${userLocation.lat},${userLocation.lng}`;
+  }
+
+  return "Nearby Legal Aid Center";
 };
 
 export default function ResultsPage() {
@@ -118,74 +253,179 @@ export default function ResultsPage() {
   ]);
   const [emergencyNumbers, setEmergencyNumbers] = useState<EmergencyNumber[]>([]);
   const [mapSearchQuery, setMapSearchQuery] = useState<string>("");
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [safetyStatus, setSafetyStatus] = useState<SafetyStatus>("unknown");
+  const [showSafetyPrompt, setShowSafetyPrompt] = useState(true);
   const { user } = useAuth();
 
   useEffect(() => {
-    // Read from localStorage that was populated by app/chat/page.tsx
-    try {
-      const storedCategory = localStorage.getItem("nyaymitra_category");
-      if (storedCategory) setCategory(storedCategory);
+    let mounted = true;
 
-      const storedUrgency = localStorage.getItem("nyaymitra_urgent");
-      if (storedUrgency)
-        setUrgency(storedUrgency === "true" ? "high" : "normal");
+    const loadCenters = async () => {
+      try {
+        const storedCategory = localStorage.getItem("nyaymitra_category");
+        if (storedCategory) setCategory(storedCategory);
 
-      const storedCenters = localStorage.getItem("nyaymitra_centers");
-      if (storedCenters) {
-        setCenters(JSON.parse(storedCenters));
-      } else {
-        setCenters([
-          {
-            id: "fallback-1",
-            name: "DLSA Offline Fallback",
-            address: "Local Court Building",
-            phone: "1800-111-111",
-            distance: 2.5,
-          },
-        ]);
-      }
+        const storedSession = sessionStorage.getItem("nyaymitra_chat_session");
+        const parsedLocation = parseUserLocation(storedSession);
+        if (parsedLocation) {
+          setUserLocation(parsedLocation);
+        }
 
-      const storedRights = localStorage.getItem("nyaymitra_rights");
-      if (storedRights) {
-        const parsedRights = normalizeRights(JSON.parse(storedRights));
-        if (parsedRights.length > 0) {
-          setRights(parsedRights);
+        const storedSafetyStatus = sessionStorage.getItem(SAFETY_STATUS_KEY);
+        if (storedSafetyStatus === "safe" || storedSafetyStatus === "unsafe") {
+          setSafetyStatus(storedSafetyStatus);
+          setShowSafetyPrompt(false);
+        } else {
+          setShowSafetyPrompt(true);
+        }
+
+        const storedUrgency = localStorage.getItem("nyaymitra_urgent");
+        if (storedUrgency) {
+          setUrgency(storedUrgency === "true" ? "high" : "normal");
+        }
+
+        const storedRights = localStorage.getItem("nyaymitra_rights");
+        if (storedRights) {
+          const parsedRights = normalizeRights(JSON.parse(storedRights));
+          if (parsedRights.length > 0) {
+            setRights(parsedRights);
+          }
+        }
+
+        const storedSteps = localStorage.getItem("nyaymitra_next_steps");
+        if (storedSteps) {
+          const parsedSteps = normalizeSteps(JSON.parse(storedSteps));
+          if (parsedSteps.length > 0) {
+            setNextSteps(parsedSteps);
+          }
+        }
+
+        const storedEmergency = localStorage.getItem("nyaymitra_emergency_numbers");
+        if (storedEmergency) {
+          const parsedEmergency = normalizeEmergencyNumbers(JSON.parse(storedEmergency));
+          if (parsedEmergency.length > 0) {
+            setEmergencyNumbers(parsedEmergency);
+          } else {
+            setEmergencyNumbers(DEFAULT_EMERGENCY_NUMBERS);
+          }
+        } else {
+          setEmergencyNumbers(DEFAULT_EMERGENCY_NUMBERS);
+        }
+
+        const storedMapQuery = localStorage.getItem("nyaymitra_map_search_query");
+        const storedCenters = localStorage.getItem("nyaymitra_centers");
+        const normalizedStoredCenters = storedCenters
+          ? normalizeCenterList(JSON.parse(storedCenters))
+          : [];
+
+        const withDistances = normalizedStoredCenters.map((center) => {
+          if (
+            userLocation &&
+            typeof center.latitude === "number" &&
+            typeof center.longitude === "number"
+          ) {
+            return {
+              ...center,
+              distance: haversineKm(userLocation, {
+                lat: center.latitude,
+                lng: center.longitude,
+              }),
+            };
+          }
+
+          return center;
+        });
+
+        withDistances.sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+
+        if (withDistances.length > 0) {
+          setCenters(withDistances);
+        } else {
+          const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`);
+          if (response.ok) {
+            const liveCenters = normalizeCenterList(await response.json()).map((center) => {
+              if (
+                userLocation &&
+                typeof center.latitude === "number" &&
+                typeof center.longitude === "number"
+              ) {
+                return {
+                  ...center,
+                  distance: haversineKm(userLocation, {
+                    lat: center.latitude,
+                    lng: center.longitude,
+                  }),
+                };
+              }
+
+              return center;
+            });
+            liveCenters.sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+            setCenters(liveCenters);
+          } else {
+            setCenters([]);
+          }
+        }
+
+        if (storedMapQuery && storedMapQuery.trim().length > 0) {
+          setMapSearchQuery(storedMapQuery);
+        } else if (withDistances[0]) {
+          setMapSearchQuery(buildMapsQuery(withDistances[0], userLocation));
+        } else if (storedCategory && storedCategory.trim().length > 0) {
+          setMapSearchQuery(`Nearest ${storedCategory} legal aid center`);
+        }
+      } catch (error) {
+        console.error("Error loading legal centers from storage", error);
+        setCenters([]);
+      } finally {
+        if (mounted) {
+          setLoadingCenters(false);
         }
       }
+    };
 
-      const storedSteps = localStorage.getItem("nyaymitra_next_steps");
-      if (storedSteps) {
-        const parsedSteps = normalizeSteps(JSON.parse(storedSteps));
-        if (parsedSteps.length > 0) {
-          setNextSteps(parsedSteps);
-        }
-      }
+    void loadCenters();
 
-      const storedEmergency = localStorage.getItem("nyaymitra_emergency_numbers");
-      if (storedEmergency) {
-        const parsedEmergency = JSON.parse(storedEmergency);
-        if (Array.isArray(parsedEmergency)) {
-          setEmergencyNumbers(parsedEmergency);
-        }
-      }
-
-      const storedMapQuery = localStorage.getItem("nyaymitra_map_search_query");
-      if (storedMapQuery && storedMapQuery.trim().length > 0) {
-        setMapSearchQuery(storedMapQuery);
-      } else if (storedCategory && storedCategory.trim().length > 0) {
-        setMapSearchQuery(`Nearest ${storedCategory} legal aid center`);
-      } else if (storedCenters) {
-        const parsedCenters = JSON.parse(storedCenters);
-        if (Array.isArray(parsedCenters) && parsedCenters[0]?.name) {
-          setMapSearchQuery(parsedCenters[0].name);
-        }
-      }
-    } catch (error) {
-      console.error("Error loading legal centers from storage", error);
-    } finally {
-      setLoadingCenters(false);
-    }
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!userLocation || centers.length === 0) return;
+
+    const sortedCenters = centers
+      .map((center) => {
+        if (typeof center.latitude === "number" && typeof center.longitude === "number") {
+          return {
+            ...center,
+            distance: haversineKm(userLocation, { lat: center.latitude, lng: center.longitude }),
+          };
+        }
+
+        return center;
+      })
+      .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+
+    setCenters(sortedCenters);
+
+    const nearestCenter = sortedCenters[0] ?? null;
+    setMapSearchQuery(buildMapsQuery(nearestCenter, userLocation));
+  }, [userLocation]);
+
+  const handleSafetySelection = (isSafe: boolean) => {
+    const nextStatus: SafetyStatus = isSafe ? "safe" : "unsafe";
+    setSafetyStatus(nextStatus);
+    setShowSafetyPrompt(false);
+    sessionStorage.setItem(SAFETY_STATUS_KEY, nextStatus);
+  };
+
+  const emergencyActions =
+    emergencyNumbers.length > 0 ? emergencyNumbers : DEFAULT_EMERGENCY_NUMBERS;
+
+  const primaryEmergencyContact =
+    emergencyActions.find((item) => item.number === "112") || emergencyActions[0];
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,7 +486,7 @@ export default function ResultsPage() {
   };
 
   return (
-    <div className="flex-1 bg-zinc-50 flex flex-col items-center">
+    <div className="flex-1 bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center text-zinc-900 dark:text-zinc-100">
       {urgency === "high" && (
         <div className="w-full bg-red-600 text-white font-semibold py-3 px-4 flex justify-center items-center gap-2">
           <AlertCircle className="w-5 h-5 animate-pulse" />
@@ -257,16 +497,76 @@ export default function ResultsPage() {
       )}
 
       <main className="w-full max-w-4xl px-4 py-8 space-y-10">
+        {showSafetyPrompt && (
+          <section className="w-full bg-white dark:bg-zinc-900 border border-red-100 dark:border-red-900/40 rounded-2xl p-5 shadow-sm">
+            <p className="text-sm font-semibold text-red-700 mb-1">
+              {t("results.safetyTitle", "Safety Check")}
+            </p>
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
+              {t("results.safetyQuestion", "Are you safe right now?")}
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              {t("results.safetySubtitle", "If you are in immediate danger, tap No and call emergency support right away.")}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => handleSafetySelection(true)}
+                className="px-4 py-2 rounded-lg bg-green-100 hover:bg-green-200 text-green-900 font-semibold"
+              >
+                {t("common.yes", "Yes")}
+              </button>
+              <button
+                onClick={() => handleSafetySelection(false)}
+                className="px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 font-semibold"
+              >
+                {t("common.no", "No")}
+              </button>
+            </div>
+          </section>
+        )}
+
+        {safetyStatus === "unsafe" && primaryEmergencyContact && (
+          <section className="w-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/70 rounded-2xl p-5 shadow-sm">
+            <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">
+              {t("results.emergencyNow", "Emergency Support")}
+            </p>
+            <h2 className="text-lg font-bold text-red-900 dark:text-red-100 mb-3">
+              {t("results.emergencyAction", "You marked that you are not safe. Call now.")}
+            </h2>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {emergencyActions.map((item) => (
+                <div
+                  key={`${item.name}-${item.number}-unsafe`}
+                  className="bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-900/40 rounded-xl p-3"
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
+                    {t("results.for", "For")}: {item.name}
+                  </p>
+                  <p className="mt-1 text-base font-bold text-red-800 dark:text-red-200">{item.number}</p>
+                  <a
+                    href={`tel:${item.number}`}
+                    className="mt-2 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold"
+                  >
+                    <AlertCircle className="w-4 h-4" />
+                    {t("results.callNow", "Call Now")}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Header & Category */}
         <div className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-[var(--color-deep-blue)] font-bold text-sm shadow-sm capitalize">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-[var(--color-deep-blue)] dark:text-blue-300 font-bold text-sm shadow-sm capitalize">
             <span className="w-2 h-2 rounded-full bg-[var(--color-deep-blue)]" />
             {t("results.category", "Category Detected")}: {category}
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {t("results.title", "Your Legal Guidance")}
           </h1>
-          <p className="text-gray-500 max-w-lg mx-auto">
+          <p className="text-gray-500 dark:text-gray-300 max-w-lg mx-auto">
             {t("results.subtitle", "Based on your description, here are your rights under Indian Law and the next steps to take.")}
           </p>
         </div>
@@ -275,7 +575,7 @@ export default function ResultsPage() {
         <section>
           <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
             <Shield className="w-6 h-6 text-[var(--color-saffron)]" />
-            <h2 className="text-2xl font-bold text-gray-800">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
               {t("results.rights", "Know Your Rights")}
             </h2>
           </div>
@@ -284,17 +584,17 @@ export default function ResultsPage() {
             {rights.map((right, i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl p-6 shadow-sm border border-orange-100 opacity-0 relative overflow-hidden group"
+                className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-orange-100 dark:border-zinc-800 opacity-0 relative overflow-hidden group"
                 style={{
                   animation: `slideUpFadeIn 0.6s ease-out forwards`,
                   animationDelay: `${i * 0.2}s`,
                 }}
               >
                 <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-saffron)] transition-all group-hover:w-2" />
-                <h3 className="font-bold text-gray-900 text-lg mb-2">
+                <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2">
                   {right.title}
                 </h3>
-                <p className="text-gray-600 text-sm leading-relaxed">
+                <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
                   {right.desc}
                 </p>
               </div>
@@ -307,7 +607,7 @@ export default function ResultsPage() {
           <div>
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
               <CheckCircle className="w-6 h-6 text-[var(--color-deep-blue)]" />
-              <h2 className="text-2xl font-bold text-gray-800">{t("results.nextSteps", "Next Steps")}</h2>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">{t("results.nextSteps", "Next Steps")}</h2>
             </div>
             <ol className="space-y-6 relative border-l-2 border-blue-100 ml-3">
               {nextSteps.map((step, index) => (
@@ -315,8 +615,8 @@ export default function ResultsPage() {
                   <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
                     {index + 1}
                   </span>
-                  <h4 className="font-bold text-gray-800">{step.title}</h4>
-                  <p className="text-sm text-gray-600 mt-1">{step.desc}</p>
+                  <h4 className="font-bold text-gray-800 dark:text-white">{step.title}</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{step.desc}</p>
                 </li>
               ))}
             </ol>
@@ -325,13 +625,13 @@ export default function ResultsPage() {
           <div>
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
               <MapPin className="w-6 h-6 text-green-600" />
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
                 {t("results.centers", "Nearby Legal Centers")}
               </h2>
             </div>
 
             {/* Map Placeholder */}
-            <div className="w-full h-48 bg-gray-200 rounded-xl mb-4 overflow-hidden relative shadow-inner">
+            <div className="w-full h-48 bg-gray-200 dark:bg-zinc-800 rounded-xl mb-4 overflow-hidden relative shadow-inner">
               <iframe
                 width="100%"
                 height="100%"
@@ -339,21 +639,21 @@ export default function ResultsPage() {
                 scrolling="no"
                 marginHeight={0}
                 marginWidth={0}
-                src={`https://maps.google.com/maps?width=100%25&height=600&hl=en&q=${encodeURIComponent(mapSearchQuery || "Nearby Legal Aid Center")}&t=&z=11&ie=UTF8&iwloc=B&output=embed`}
+                src={`https://maps.google.com/maps?width=100%25&height=600&hl=en&q=${encodeURIComponent(mapSearchQuery || "Nearby Legal Aid Center")}&t=&z=13&ie=UTF8&iwloc=B&output=embed`}
               ></iframe>
             </div>
 
             {emergencyNumbers.length > 0 && (
-              <div className="mb-4 bg-red-50 border border-red-100 rounded-xl p-3">
+              <div className="mb-4 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-xl p-3">
                 <p className="text-sm font-semibold text-red-700 mb-2">Emergency Numbers</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {emergencyNumbers.map((item) => (
                     <a
                       key={`${item.name}-${item.number}`}
                       href={`tel:${item.number}`}
-                      className="text-sm bg-white px-3 py-2 rounded-lg border border-red-100 hover:bg-red-100 transition-colors"
+                      className="text-sm bg-white dark:bg-zinc-900 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/40 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                     >
-                      <span className="font-medium text-gray-800">{item.name}</span>
+                      <span className="font-medium text-gray-800 dark:text-zinc-100">{item.name}</span>
                       <span className="text-red-700 ml-2">{item.number}</span>
                     </a>
                   ))}
@@ -363,29 +663,39 @@ export default function ResultsPage() {
 
             <div className="space-y-3">
               {loadingCenters && (
-                <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-gray-500 shadow-sm">
+                <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-sm text-gray-500 dark:text-gray-300 shadow-sm">
                   {t("results.loadingCenters", "Loading legal centers from the database...")}
                 </div>
               )}
               {!loadingCenters && centers.length === 0 && (
-                <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-gray-500 shadow-sm">
+                <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-sm text-gray-500 dark:text-gray-300 shadow-sm">
                   {t("results.noCenters", "No legal centers found in the database.")}
                 </div>
               )}
               {centers.map((center) => (
                 <div
                   key={center.id}
-                  className="bg-white p-4 rounded-xl border border-gray-100 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow"
+                  className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div>
-                    <h4 className="font-bold text-gray-900">{center.name}</h4>
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <h4 className="font-bold text-gray-900 dark:text-white">{center.name}</h4>
+                    <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
                       {center.address}
-                      {center.distance ? ` • ${center.distance} km` : ""}
+                      {typeof center.distance === "number" ? ` • ${center.distance.toFixed(2)} km` : ""}
                     </p>
                     <p className="text-xs font-medium text-[var(--color-deep-blue)] mt-1">
                       {center.phone}
                     </p>
+                    {typeof center.latitude === "number" && typeof center.longitude === "number" && (
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${center.latitude},${center.longitude}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold mt-1 inline-block"
+                      >
+                        Open exact location
+                      </a>
+                    )}
                   </div>
                   <button
                     onClick={() => {

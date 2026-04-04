@@ -74,18 +74,29 @@ export default function Navbar() {
             {user ? (
               <div className="flex items-center gap-3">
                 <div className="hidden sm:flex items-center gap-1">
-                  <Link
-                    href="/chat"
-                    className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
-                  >
-                    {t("nav.ask", "Ask")}
-                  </Link>
-                  <Link
-                    href="/appointments"
-                    className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
-                  >
-                    {t("nav.appointments", "Appointments")}
-                  </Link>
+                  {isAdmin ? (
+                    <Link
+                      href="/admin"
+                      className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
+                    >
+                      Dashboard
+                    </Link>
+                  ) : (
+                    <>
+                      <Link
+                        href="/chat"
+                        className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        {t("nav.ask", "Ask")}
+                      </Link>
+                      <Link
+                        href="/appointments"
+                        className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
+                      >
+                        {t("nav.appointments", "Appointments")}
+                      </Link>
+                    </>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 font-medium">
                   <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-[var(--color-deep-blue)] dark:text-blue-400">

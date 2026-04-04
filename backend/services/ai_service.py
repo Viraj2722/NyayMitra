@@ -1,11 +1,13 @@
 import os
 import json
+import re
 from dotenv import load_dotenv
 
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', '.env')
 load_dotenv(env_path)
 
 import google.generativeai as genai
+from services.translation_service import translate_text
 
 # Configure Gemini
 api_key = os.getenv("GEMINI_API_KEY")
@@ -30,9 +32,11 @@ JARGON_MAP = {
 
 
 def remove_jargon(text):
+    sanitized = text or ""
     for term, replacement in JARGON_MAP.items():
-        text = text.lower().replace(term, replacement)
-    return text
+        pattern = re.compile(rf"\b{re.escape(term)}\b", re.IGNORECASE)
+        sanitized = pattern.sub(replacement, sanitized)
+    return sanitized
 
 
 SYSTEM_PROMPT = """
@@ -51,18 +55,70 @@ Rules:
 - map_search_query should target nearest legal aid center or advocate relevant to the user category and urgency.
 """
 
-LANGUAGE_INSTRUCTION_MAP = {
-    "English": "User has selected English. Respond entirely in English regardless of what language they write in.",
-    "Hindi": "User has selected Hindi. Respond entirely in Hindi regardless of what language they write in.",
-    "Marathi": "User has selected Marathi. Respond entirely in Marathi regardless of what language they write in.",
-}
+def _language_instruction(selected_language):
+    language = selected_language or "English"
+    return f"User has selected {language}. Respond entirely in {language} regardless of what language they write in."
+
+
+def _translate_response_payload(data, selected_language):
+    if not selected_language or selected_language == "English":
+        return data
+
+    translated = dict(data)
+
+    if isinstance(translated.get("response"), str):
+        translated["response"] = translate_text(translated["response"], selected_language)
+
+    if isinstance(translated.get("rights"), list):
+        translated["rights"] = [
+            {
+                **item,
+                **{
+                    key: translate_text(value, selected_language)
+                    for key, value in item.items()
+                    if key in {"title", "desc", "description", "detail", "name"} and isinstance(value, str)
+                },
+            }
+            if isinstance(item, dict)
+            else item
+            for item in translated["rights"]
+        ]
+
+    if isinstance(translated.get("next_steps"), list):
+        translated["next_steps"] = [
+            {
+                **item,
+                **{
+                    key: translate_text(value, selected_language)
+                    for key, value in item.items()
+                    if key in {"title", "desc", "description", "detail", "name"} and isinstance(value, str)
+                },
+            }
+            if isinstance(item, dict)
+            else item
+            for item in translated["next_steps"]
+        ]
+
+    if isinstance(translated.get("emergency_numbers"), list):
+        translated["emergency_numbers"] = [
+            {
+                **item,
+                **{
+                    key: translate_text(value, selected_language)
+                    for key, value in item.items()
+                    if key == "name" and isinstance(value, str)
+                },
+            }
+            if isinstance(item, dict)
+            else item
+            for item in translated["emergency_numbers"]
+        ]
+
+    return translated
 
 
 def _generate_response_payload(user_input, selected_language="English", intake_context=None):
-    language_instruction = LANGUAGE_INSTRUCTION_MAP.get(
-        selected_language,
-        LANGUAGE_INSTRUCTION_MAP["English"],
-    )
+    language_instruction = _language_instruction(selected_language)
 
     context_block = ""
     if intake_context:
@@ -95,9 +151,9 @@ def _generate_response_payload(user_input, selected_language="English", intake_c
         data.setdefault("next_steps", [])
         data.setdefault("emergency_numbers", [{"name": "National Emergency", "number": "112"}])
         data.setdefault("map_search_query", "Nearest Legal Aid Clinic")
-        return data
+        return _translate_response_payload(data, selected_language)
     except Exception as e:
-        return {
+        fallback = {
             "response": remove_jargon("I am having trouble connecting to my legal database right now. Please try again."),
             "category": "general",
             "rights": [{"title": "Basic Constitutional Rights", "desc": "You have the right to seek justice under the Indian Constitution."}],
@@ -105,6 +161,7 @@ def _generate_response_payload(user_input, selected_language="English", intake_c
             "emergency_numbers": [{"name": "National Emergency", "number": "112"}],
             "map_search_query": "Nearest Legal Aid Clinic"
         }
+        return _translate_response_payload(fallback, selected_language)
 
 
 def generate_analytical_response(user_input, selected_language="English", intake_context=None):

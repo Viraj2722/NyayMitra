@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { Lock, Plus, Activity, FileText, Database, LogOut, ShieldAlert, Calendar } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Lock, Plus, Activity, Database, LogOut, ShieldAlert, Calendar, BarChart3 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, limit, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
@@ -70,6 +70,34 @@ export default function AdminPage() {
   const liveCenters = centers.length;
   const liveQueries = recentQueries.length;
   const liveAppointments = recentAppointments.length;
+
+  const queryAnalytics = useMemo(() => {
+    const total = recentQueries.length;
+    const categoryCounts: Record<string, number> = {};
+    let highUrgency = 0;
+
+    for (const row of recentQueries) {
+      const category = (row.category || "Unknown").trim();
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      if ((row.urgency || "normal") === "high") {
+        highUrgency += 1;
+      }
+    }
+
+    const categories = Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([label, count]) => ({ label, count }));
+
+    const highUrgencyPercent = total > 0 ? Math.round((highUrgency / total) * 100) : 0;
+
+    return {
+      total,
+      categories,
+      highUrgency,
+      highUrgencyPercent,
+    };
+  }, [recentQueries]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -398,55 +426,60 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Recent Queries */}
+            {/* Query Analytics */}
             <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 p-6 overflow-hidden">
               <div className="flex items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-6 h-6 text-[var(--color-deep-blue)] dark:text-blue-400" />
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Queries</h2>
+                  <BarChart3 className="w-6 h-6 text-[var(--color-deep-blue)] dark:text-blue-400" />
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Query Analytics</h2>
                 </div>
                 <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Live</span>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-zinc-800 uppercase tracking-wide">
-                      <th className="pb-3 pr-4 font-semibold">Timestamp</th>
-                      <th className="pb-3 pr-4 font-semibold">Category</th>
-                      <th className="pb-3 pr-4 font-semibold">Language</th>
-                      <th className="pb-3 font-semibold">Urgency</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-sm text-gray-800 dark:text-gray-200">
-                    {recentQueries.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="py-8 text-center text-gray-500 dark:text-gray-400">
-                          No recent queries found.
-                        </td>
-                      </tr>
-                    )}
-                    {recentQueries.map((query) => (
-                      <tr key={query.id} className="border-b border-gray-50 dark:border-zinc-800/80 last:border-b-0">
-                        <td className="py-4 pr-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                          {query.created_at ? new Date(query.created_at).toLocaleString() : "Now"}
-                        </td>
-                        <td className="py-4 pr-4">
-                          <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-500/10 text-[var(--color-deep-blue)] dark:text-blue-300 px-3 py-1 font-semibold">
-                            {query.category || "Unknown"}
-                          </span>
-                        </td>
-                        <td className="py-4 pr-4 text-gray-600 dark:text-gray-300">{query.language || "Unknown"}</td>
-                        <td className="py-4">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 font-semibold ${query.urgency === "high" ? "bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300" : "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300"}`}>
-                            {query.urgency || "normal"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {queryAnalytics.total === 0 ? (
+                <div className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                  No recent queries found.
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="rounded-2xl border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 p-4">
+                      <p className="text-[11px] uppercase tracking-wide font-bold text-gray-500 dark:text-gray-400">Total Queries</p>
+                      <p className="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white">{queryAnalytics.total}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 p-4">
+                      <p className="text-[11px] uppercase tracking-wide font-bold text-gray-500 dark:text-gray-400">High Urgency</p>
+                      <p className="mt-2 text-3xl font-extrabold text-red-700 dark:text-red-300">{queryAnalytics.highUrgency}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-950 p-4">
+                      <p className="text-[11px] uppercase tracking-wide font-bold text-gray-500 dark:text-gray-400">Urgency Rate</p>
+                      <p className="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white">{queryAnalytics.highUrgencyPercent}%</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-5">
+                    <div className="rounded-2xl border border-gray-100 dark:border-zinc-800 p-4">
+                      <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-3">Top Categories</h3>
+                      <div className="space-y-3">
+                        {queryAnalytics.categories.map((item) => {
+                          const percent = Math.max(6, Math.round((item.count / queryAnalytics.total) * 100));
+                          return (
+                            <div key={`cat-${item.label}`}>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="font-semibold text-gray-700 dark:text-gray-300">{item.label}</span>
+                                <span className="text-gray-500 dark:text-gray-400">{item.count}</span>
+                              </div>
+                              <div className="h-2 rounded-full bg-gray-100 dark:bg-zinc-800 overflow-hidden">
+                                <div className="h-full rounded-full bg-[var(--color-deep-blue)]" style={{ width: `${percent}%` }} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 p-6 overflow-hidden">
