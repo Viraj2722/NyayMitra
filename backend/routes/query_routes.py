@@ -8,6 +8,33 @@ import datetime
 
 query_bp = Blueprint("query", __name__)
 
+
+def _serialize_query(doc):
+    data = doc.to_dict() or {}
+    created_at = data.get("created_at")
+    if hasattr(created_at, "isoformat"):
+        created_at = created_at.isoformat()
+
+    return {
+        "id": doc.id,
+        "user_id": data.get("user_id"),
+        "queryText": data.get("queryText"),
+        "detectedLanguage": data.get("detectedLanguage"),
+        "selectedResponseLanguage": data.get("selectedResponseLanguage"),
+        "legalCategoryDetected": data.get("legalCategoryDetected"),
+        "intakeFollowUpQuestion": data.get("intakeFollowUpQuestion"),
+        "intakeFollowUpAnswer": data.get("intakeFollowUpAnswer"),
+        "isUrgent": data.get("isUrgent", False),
+        "isAnonymous": data.get("isAnonymous", False),
+        "aiResponse": data.get("aiResponse"),
+        "translated_keywords": data.get("translated_keywords"),
+        "language": data.get("detectedLanguage") or data.get("selectedResponseLanguage"),
+        "category": data.get("legalCategoryDetected"),
+        "urgency": "high" if data.get("isUrgent") else "normal",
+        "created_at": created_at,
+        "source": data.get("source", "live"),
+    }
+
 @query_bp.route("/translate-ui", methods=["POST"])
 def translate_ui_text():
     payload = request.json or {}
@@ -34,13 +61,12 @@ def translate_ui_text():
 def recent_queries():
     try:
         db = firestore.client()
-        docs = db.collection("queries").order_by("created_at", direction=firestore.Query.DESCENDING).limit(10).stream()
+        live_docs = db.collection("live_queries").order_by("created_at", direction=firestore.Query.DESCENDING).limit(10).stream()
+        queries = [_serialize_query(doc) for doc in live_docs]
 
-        queries = []
-        for doc in docs:
-            data = doc.to_dict()
-            data["id"] = doc.id
-            queries.append(data)
+        if not queries:
+            fallback_docs = db.collection("queries").order_by("created_at", direction=firestore.Query.DESCENDING).limit(10).stream()
+            queries = [_serialize_query(doc) for doc in fallback_docs]
 
         return jsonify(queries)
     except Exception as e:
@@ -83,6 +109,27 @@ def handle_query():
 
     # Step 7: Note - We are now securely saving data to Firebase Data Connect 
     # directly from the Next.js frontend to avoid duplicate saving and credential issues.
+
+    try:
+        db = firestore.client()
+        db.collection("live_queries").add({
+            "user_id": data.get("userId"),
+            "queryText": user_input,
+            "detectedLanguage": lang,
+            "selectedResponseLanguage": selected_language,
+            "legalCategoryDetected": category,
+            "intakeFollowUpQuestion": intake_context.get("followUpQuestion") if isinstance(intake_context, dict) else None,
+            "intakeFollowUpAnswer": intake_context.get("followUpAnswer") if isinstance(intake_context, dict) else None,
+            "isUrgent": urgent,
+            "isAnonymous": is_anonymous,
+            "aiResponse": ai_response,
+            "translated_keywords": translated,
+            "source": "live",
+            "created_at": datetime.datetime.utcnow(),
+            "updated_at": datetime.datetime.utcnow(),
+        })
+    except Exception as db_error:
+        print("Failed to persist live query to Firestore:", db_error)
     
     return jsonify({
         "response": ai_response,

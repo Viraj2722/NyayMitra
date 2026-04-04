@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Lock, Plus, Activity, FileText, Database, LogOut, ShieldAlert, Calendar } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useLanguage } from "@/context/LanguageContext";
+import { db } from "@/lib/firebase";
+import { collection, limit, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
 
@@ -18,11 +19,14 @@ type Center = {
 type QueryRow = {
   id: string;
   translated_keywords?: string;
+  detectedLanguage?: string;
+  selectedResponseLanguage?: string;
   language?: string;
   category?: string;
   urgency?: string;
   isAnonymous?: boolean;
   created_at?: string;
+  queryText?: string;
 };
 
 type AppointmentRow = {
@@ -42,7 +46,6 @@ type AppointmentRow = {
 };
 
 export default function AdminPage() {
-  const { t } = useLanguage();
   const { user, isAdmin, loading, signInWithEmail, logout } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -63,6 +66,7 @@ export default function AdminPage() {
   const [recentQueries, setRecentQueries] = useState<QueryRow[]>([]);
   const [recentAppointments, setRecentAppointments] = useState<AppointmentRow[]>([]);
   const [loadingData, setLoadingData] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const liveCenters = centers.length;
   const liveQueries = recentQueries.length;
   const liveAppointments = recentAppointments.length;
@@ -73,7 +77,7 @@ export default function AdminPage() {
     try {
       await signInWithEmail(email, password);
     } catch {
-      setError(t("admin.invalidCreds", "Invalid admin credentials"));
+      setError("Invalid admin credentials");
     }
   };
 
@@ -116,7 +120,7 @@ export default function AdminPage() {
         },
         ...current,
       ]);
-      setCenterMessage(t("admin.centerSaved", "Center saved to database."));
+      setCenterMessage("Center saved to the database.");
       setCenterName("");
       setCenterPhone("");
       setCenterAddress("");
@@ -128,42 +132,144 @@ export default function AdminPage() {
       setCenterEmergency(true);
       setCenterPriority(10);
     } catch {
-      setCenterMessage(t("admin.centerSaveFailed", "Unable to save center right now."));
+      setCenterMessage("Unable to save the center right now.");
     } finally {
       setSavingCenter(false);
     }
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [centersResponse, queriesResponse, appointmentsResponse] = await Promise.all([
-          fetch(`${BACKEND_BASE_URL}/api/centers/`),
-          fetch(`${BACKEND_BASE_URL}/api/query/recent`),
-          fetch(`${BACKEND_BASE_URL}/api/appointments/recent`),
-        ]);
+  const normalizeTimestamp = (value: unknown) => {
+    if (value instanceof Timestamp) {
+      return value.toDate().toISOString();
+    }
 
-        const centersData = centersResponse.ok ? await centersResponse.json() : [];
-        const queriesData = queriesResponse.ok ? await queriesResponse.json() : [];
-        const appointmentsData = appointmentsResponse && appointmentsResponse.ok ? await appointmentsResponse.json() : [];
+    if (value && typeof value === "object" && "toDate" in value && typeof (value as { toDate?: () => Date }).toDate === "function") {
+      return (value as { toDate: () => Date }).toDate().toISOString();
+    }
 
-        setCenters(Array.isArray(centersData) ? centersData : []);
-        setRecentQueries(Array.isArray(queriesData) ? queriesData : []);
-        setRecentAppointments(Array.isArray(appointmentsData) ? appointmentsData : []);
-      } catch (error) {
-        console.error("Failed to load admin dashboard data", error);
-        setCenters([]);
-        setRecentQueries([]);
-        setRecentAppointments([]);
-      } finally {
+    if (typeof value === "string") {
+      return value;
+    }
+
+    return undefined;
+  };
+
+  const loadData = useCallback(() => {
+    const centersQuery = query(collection(db, "centers"));
+    const liveQueriesQuery = query(collection(db, "live_queries"), orderBy("created_at", "desc"), limit(10));
+    const appointmentsQuery = query(collection(db, "appointments"), orderBy("created_at", "desc"), limit(10));
+
+    const unsubscribeCenters = onSnapshot(
+      centersQuery,
+      (snapshot) => {
+        const centerRows = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...(doc.data() as Omit<Center, "id">),
+        }));
+        centerRows.sort((left, right) => {
+          const leftEmergency = Boolean((left as { emergency?: boolean }).emergency);
+          const rightEmergency = Boolean((right as { emergency?: boolean }).emergency);
+          if (leftEmergency !== rightEmergency) {
+            return leftEmergency ? -1 : 1;
+          }
+          const leftPriority = Number((left as { priority?: number }).priority || 0);
+          const rightPriority = Number((right as { priority?: number }).priority || 0);
+          if (leftPriority !== rightPriority) {
+            return rightPriority - leftPriority;
+          }
+          return (left.name || "").localeCompare(right.name || "");
+        });
+        setCenters(centerRows);
+        setLastUpdated(new Date().toLocaleTimeString());
         setLoadingData(false);
+        setError("");
+      },
+      (listenerError) => {
+        console.error("Failed to load live centers", listenerError);
+        setError("Live Firestore data is unavailable. Check Firestore rules and refresh this page.");
+        setLoadingData(false);
+      },
+    );
+
+    const unsubscribeQueries = onSnapshot(
+      liveQueriesQuery,
+      (snapshot) => {
+        const queryRows = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            translated_keywords: data.translated_keywords,
+            detectedLanguage: data.detectedLanguage,
+            selectedResponseLanguage: data.selectedResponseLanguage,
+            language: data.detectedLanguage || data.selectedResponseLanguage || "Unknown",
+            category: data.legalCategoryDetected || data.category || "Unknown",
+            urgency: data.isUrgent ? "high" : "normal",
+            isAnonymous: data.isAnonymous,
+            created_at: normalizeTimestamp(data.created_at),
+            queryText: data.queryText,
+          };
+        });
+
+        setRecentQueries(queryRows);
+        setLastUpdated(new Date().toLocaleTimeString());
+      },
+      (listenerError) => {
+        console.error("Failed to load live queries", listenerError);
+        setError("Live query data is unavailable right now.");
+      },
+    );
+
+    const unsubscribeAppointments = onSnapshot(
+      appointmentsQuery,
+      (snapshot) => {
+        const appointmentRows = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            user_id: data.user_id,
+            center_id: data.center_id,
+            center_name: data.center_name,
+            center_address: data.center_address,
+            center_phone: data.center_phone,
+            name: data.name,
+            phone: data.phone,
+            issue_summary: data.issue_summary,
+            date: data.date,
+            time: data.time,
+            status: data.status,
+            created_at: normalizeTimestamp(data.created_at),
+          };
+        });
+
+        setRecentAppointments(appointmentRows);
+        setLastUpdated(new Date().toLocaleTimeString());
+      },
+      (listenerError) => {
+        console.error("Failed to load live appointments", listenerError);
+        setError("Live appointment data is unavailable right now.");
+      },
+    );
+
+    return () => {
+      unsubscribeCenters();
+      unsubscribeQueries();
+      unsubscribeAppointments();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user || !isAdmin) {
+      return;
+    }
+
+    const cleanup = loadData();
+
+    return () => {
+      if (typeof cleanup === "function") {
+        cleanup();
       }
     };
-
-    if (user && isAdmin) {
-      loadData();
-    }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, loadData]);
 
   if (loading) {
     return (
@@ -172,8 +278,8 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
             <Lock className="w-8 h-8 text-[var(--color-deep-blue)] dark:text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t("admin.checking", "Checking access")}</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">{t("admin.verifying", "Verifying your Firebase admin access.")}</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Checking access</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">Verifying your Firebase admin access.</p>
         </div>
       </div>
     );
@@ -186,14 +292,14 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="w-8 h-8 text-[var(--color-deep-blue)] dark:text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t("admin.access", "Admin Access")}</h2>
-          <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">{t("admin.protectedDashboard", "Protected dashboard for managing centers and monitoring live queries.")}</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Admin Access</h2>
+          <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">Protected dashboard for managing centers and monitoring live queries.</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={t("admin.adminEmail", "Admin Email")}
+              placeholder="Admin Email"
               className="w-full bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[var(--color-deep-blue)] dark:focus:ring-blue-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
               required
             />
@@ -201,13 +307,13 @@ export default function AdminPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder={t("admin.password", "Password")}
+              placeholder="Password"
               className="w-full bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[var(--color-deep-blue)] dark:focus:ring-blue-500 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 transition-colors"
               required
             />
             {error && <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
             <button type="submit" className="w-full bg-[var(--color-deep-blue)] text-white font-bold py-3 rounded-xl shadow-md hover:bg-blue-900 transition-colors">
-              {t("admin.accessDashboard", "Access Dashboard")}
+              Access Dashboard
             </button>
           </form>
         </div>
@@ -222,10 +328,10 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShieldAlert className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t("admin.denied", "Access denied")}</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access denied</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">Your account is signed in, but it is not marked as admin.</p>
           <button onClick={logout} className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3 rounded-xl shadow-md transition-colors">
-            {t("nav.signOut", "Sign out")}
+            Sign out
           </button>
         </div>
       </div>
@@ -239,10 +345,10 @@ export default function AdminPage() {
         <header className="rounded-3xl border border-white/70 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur shadow-sm p-5 md:p-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-[var(--color-deep-blue)] dark:text-blue-300 text-xs font-bold uppercase tracking-[0.18em] mb-3">
-              {t("admin.adminConsole", "Admin Console")}
+              Admin Console
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">{t("admin.overview", "Dashboard Overview")}</h1>
-            <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-2xl">{t("admin.monitorDesc", "Monitor live queries and keep legal centers up to date from one place.")}</p>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">Dashboard Overview</h1>
+            <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-2xl">Monitor live queries and keep legal centers up to date from one place.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <div className="bg-white dark:bg-zinc-950 px-4 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex items-center gap-3 min-w-[190px]">
@@ -250,34 +356,45 @@ export default function AdminPage() {
                 <Activity className="w-5 h-5 text-green-500" />
               </div>
               <div>
-                <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wide">{t("admin.systemStatus", "System Status")}</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{loadingData ? t("admin.loadingLiveData", "Loading live data...") : t("admin.liveDataConnected", "Live data connected")}</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wide">System Status</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">{loadingData ? "Loading live data..." : "Live data connected"}</p>
               </div>
             </div>
             <button onClick={logout} className="bg-white dark:bg-zinc-950 px-4 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors">
               <LogOut className="w-4 h-4" />
-              {t("nav.signOut", "Sign out")}
+              Sign out
             </button>
           </div>
         </header>
+
+        {error && (
+          <div className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+            {error}
+          </div>
+        )}
+
+        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-3">
+          <span>Live Firestore listeners active.</span>
+          <span>{lastUpdated ? `Last updated at ${lastUpdated}` : "Waiting for first snapshot..."}</span>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 p-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("admin.centers", "Centers")}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Centers</p>
                 <div className="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white">{liveCenters}</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("admin.liveRowsCenters", "Live rows from Firestore")}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Live rows from Firestore</p>
               </div>
               <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 p-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("admin.queries", "Queries")}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Queries</p>
                 <div className="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white">{liveQueries}</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("admin.recentQueryRecords", "Recent query records")}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Recent query records</p>
               </div>
               <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 p-5">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("admin.appointments", "Appointments")}</p>
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Appointments</p>
                 <div className="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white">{liveAppointments}</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("admin.bookedRows", "Booked rows from the database")}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Booked rows from the database</p>
               </div>
             </div>
 
@@ -286,9 +403,9 @@ export default function AdminPage() {
               <div className="flex items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-2">
                   <FileText className="w-6 h-6 text-[var(--color-deep-blue)] dark:text-blue-400" />
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t("admin.recentQueries", "Recent Queries")}</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Queries</h2>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("admin.live", "Live")}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Live</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -296,16 +413,16 @@ export default function AdminPage() {
                   <thead>
                     <tr className="text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-zinc-800 uppercase tracking-wide">
                       <th className="pb-3 pr-4 font-semibold">Timestamp</th>
-                      <th className="pb-3 pr-4 font-semibold">{t("admin.category", "Category")}</th>
-                      <th className="pb-3 pr-4 font-semibold">{t("admin.language", "Language")}</th>
-                      <th className="pb-3 font-semibold">{t("admin.urgency", "Urgency")}</th>
+                      <th className="pb-3 pr-4 font-semibold">Category</th>
+                      <th className="pb-3 pr-4 font-semibold">Language</th>
+                      <th className="pb-3 font-semibold">Urgency</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm text-gray-800 dark:text-gray-200">
                     {recentQueries.length === 0 && (
                       <tr>
                         <td colSpan={4} className="py-8 text-center text-gray-500 dark:text-gray-400">
-                          {t("admin.noRecentQueries", "No recent queries found.")}
+                          No recent queries found.
                         </td>
                       </tr>
                     )}
@@ -336,9 +453,9 @@ export default function AdminPage() {
               <div className="flex items-center justify-between gap-4 mb-6">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-6 h-6 text-[var(--color-saffron)]" />
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t("admin.recentAppointments", "Recent Appointments")}</h2>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent Appointments</h2>
                 </div>
-                <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">{t("admin.live", "Live")}</span>
+                <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Live</span>
               </div>
 
               <div className="overflow-x-auto">
@@ -356,7 +473,7 @@ export default function AdminPage() {
                     {recentAppointments.length === 0 && (
                       <tr>
                         <td colSpan={5} className="py-8 text-center text-gray-500 dark:text-gray-400">
-                          {t("admin.noRecentAppointments", "No recent appointments found.")}
+                          No recent appointments found.
                         </td>
                       </tr>
                     )}
@@ -391,7 +508,7 @@ export default function AdminPage() {
           <div className="bg-white dark:bg-zinc-900 rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 p-6 self-start sticky top-24">
             <div className="flex items-center gap-2 mb-6">
               <Database className="w-6 h-6 text-[var(--color-saffron)]" />
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t("admin.manageCenters", "Manage Centers")}</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Manage Centers</h2>
             </div>
 
             <div className="space-y-3 mb-4 max-h-64 overflow-y-auto pr-1">
@@ -404,61 +521,61 @@ export default function AdminPage() {
               ))}
               {!loadingData && centers.length === 0 && (
                 <div className="rounded-xl border border-dashed border-gray-200 dark:border-zinc-700 p-4 text-sm text-gray-500 dark:text-gray-400 bg-gray-50/60 dark:bg-zinc-950/60">
-                  {t("admin.noCentersFound", "No centers found in the database.")}
+                  No centers found in the database.
                 </div>
               )}
             </div>
             
             <form className="space-y-4" onSubmit={handleCenterSubmit}>
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.centerName", "Center Name")}</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Center Name</label>
                 <input required value={centerName} onChange={(e) => setCenterName(e.target.value)} type="text" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="e.g. DLSA Borivali" />
               </div>
               
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.contactSetup", "Contact Setup")}</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Contact Setup</label>
                 <input required value={centerPhone} onChange={(e) => setCenterPhone(e.target.value)} type="tel" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="Phone Number" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.coordinatesAddress", "Coordinates & Address")}</label>
-                <textarea required value={centerAddress} onChange={(e) => setCenterAddress(e.target.value)} rows={3} className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder={t("admin.fullAddress", "Full Address...")}></textarea>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Address</label>
+                <textarea required value={centerAddress} onChange={(e) => setCenterAddress(e.target.value)} rows={3} className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="Full address..."></textarea>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.categories", "Categories")}</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Categories</label>
                 <input value={centerCategories} onChange={(e) => setCenterCategories(e.target.value)} type="text" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="emergency, domestic, labor" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.languages", "Languages")}</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Languages</label>
                 <input value={centerLanguages} onChange={(e) => setCenterLanguages(e.target.value)} type="text" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="en, hi, mr" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.services", "Services")}</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Services</label>
                 <input value={centerServices} onChange={(e) => setCenterServices(e.target.value)} type="text" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="free legal advice, referral" />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.description", "Description")}</label>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Description</label>
                 <textarea value={centerDescription} onChange={(e) => setCenterDescription(e.target.value)} rows={3} className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors resize-none placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="What this center specializes in..."></textarea>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.timings", "Timings")}</label>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Timings</label>
                   <input value={centerTimings} onChange={(e) => setCenterTimings(e.target.value)} type="text" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="Mon-Sat 10AM-5PM" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">{t("admin.priority", "Priority")}</label>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Priority</label>
                   <input value={centerPriority} onChange={(e) => setCenterPriority(Number(e.target.value))} type="number" min={0} max={100} className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" />
                 </div>
               </div>
 
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
                 <input checked={centerEmergency} onChange={(e) => setCenterEmergency(e.target.checked)} type="checkbox" className="rounded border-gray-300 dark:border-zinc-700 text-[var(--color-deep-blue)] focus:ring-[var(--color-deep-blue)]" />
-                {t("admin.emergencyCenter", "Emergency center")}
+                Emergency center
               </label>
 
               {centerMessage && (
@@ -469,7 +586,7 @@ export default function AdminPage() {
 
               <div className="pt-2">
                 <button disabled={savingCenter} className="w-full bg-black dark:bg-white dark:text-zinc-950 hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                  <Plus className="w-5 h-5"/> {savingCenter ? t("admin.saving", "Saving...") : t("admin.addToDatabase", "Add to Database")}
+                  <Plus className="w-5 h-5"/> {savingCenter ? "Saving..." : "Add to Database"}
                 </button>
               </div>
             </form>

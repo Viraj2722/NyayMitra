@@ -225,6 +225,7 @@ export default function ChatPage() {
           lat: null,
           lng: null,
           isAnonymous: false,
+          userId: user.uid,
           selectedLanguage,
           intakeContext,
         }),
