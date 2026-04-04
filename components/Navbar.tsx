@@ -7,7 +7,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { Shield, ShieldAlert, LogOut, User as UserIcon, Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
-  const { user, logout } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const { t } = useLanguage();
   const [anonymousMode, setAnonymousMode] = useState(false);
   // Keep initial render deterministic to avoid hydration mismatch.
@@ -91,7 +91,7 @@ export default function Navbar() {
                   <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-[var(--color-deep-blue)] dark:text-blue-400">
                     <UserIcon className="w-4 h-4" />
                   </div>
-                  <span className="hidden sm:inline">{user.displayName || t("nav.user", "User")}</span>
+                  <span className="hidden sm:inline">{isAdmin ? "Admin" : user.displayName || t("nav.user", "User")}</span>
                 </div>
                 <button
                   onClick={logout}
