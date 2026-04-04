@@ -4,8 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircle, Clock, MapPin, Phone, AlertCircle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+import { useLanguage } from "@/context/LanguageContext";
 
 interface Appointment {
   id: string;
@@ -22,9 +21,10 @@ interface Appointment {
 }
 
 export default function AppointmentsPage() {
+  const { t } = useLanguage();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user, isAdmin } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function AppointmentsPage() {
           <div className="inline-block p-3 bg-blue-100 rounded-full animate-spin">
             <Clock className="w-8 h-8 text-blue-600" />
           </div>
-          <p className="text-gray-600 dark:text-gray-300 font-medium">Loading your appointments...</p>
+          <p className="text-gray-600 dark:text-gray-300 font-medium">{t("appointments.loading", "Loading your appointments...")}</p>
         </div>
       </div>
     );
@@ -120,10 +120,10 @@ export default function AppointmentsPage() {
         {/* Header */}
         <div className="text-center space-y-3 pt-4">
           <h1 className="text-4xl font-extrabold text-gray-900 dark:text-white">
-            Your Appointments
+            {t("appointments.title", "Your Appointments")}
           </h1>
           <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto">
-            Track and manage your legal consultations with free legal aid centers
+            {t("appointments.subtitle", "Track and manage your legal consultations with free legal aid centers")}
           </p>
         </div>
 
@@ -131,15 +131,15 @@ export default function AppointmentsPage() {
         {appointments.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-2xl border-2 border-dashed border-blue-200 dark:border-gray-700 p-12 text-center space-y-4">
             <AlertCircle className="w-12 h-12 text-gray-400 mx-auto" />
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">No appointments yet</h3>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">{t("appointments.none", "No appointments yet")}</h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Submit a legal query and book an appointment with a legal aid center to get started.
+              {t("appointments.noneDesc", "Submit a legal query and book an appointment with a legal aid center to get started.")}
             </p>
             <button
               onClick={() => router.push("/chat")}
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors mt-4"
             >
-              Submit Legal Query <ArrowRight className="w-4 h-4" />
+              {t("appointments.submitQuery", "Submit Legal Query")} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         ) : (
@@ -155,14 +155,14 @@ export default function AppointmentsPage() {
                 {/* Status Badge */}
                 <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border mb-4 text-sm font-semibold ${getStatusColor(appointment.status)}`}>
                   {getStatusIcon(appointment.status)}
-                  <span className="capitalize">{appointment.status === "pending" ? "Awaiting Confirmation" : appointment.status}</span>
+                  <span className="capitalize">{appointment.status === "pending" ? t("appointments.awaiting", "Awaiting Confirmation") : t(`appointments.status.${appointment.status}`, appointment.status)}</span>
                 </div>
 
                 <div className="grid lg:grid-cols-3 gap-6">
                   {/* Left: Center Info */}
                   <div className="lg:col-span-1 space-y-3">
                     <div>
-                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">Legal Center</p>
+                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">{t("appointments.legalCenter", "Legal Center")}</p>
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white">{appointment.center_name}</h3>
                     </div>
                     <div className="flex items-start gap-2 text-sm">
@@ -180,7 +180,7 @@ export default function AppointmentsPage() {
                   {/* Middle: Appointment Details */}
                   <div className="lg:col-span-1 space-y-3">
                     <div>
-                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">Date & Time</p>
+                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">{t("appointments.dateTime", "Date & Time")}</p>
                       <div className="space-y-1">
                         <p className="text-lg font-bold text-gray-900 dark:text-white">
                           {new Date(appointment.date).toLocaleDateString('en-IN', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
@@ -193,7 +193,7 @@ export default function AppointmentsPage() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">Your Details</p>
+                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">{t("appointments.yourDetails", "Your Details")}</p>
                       <p className="text-sm font-medium text-gray-900 dark:text-white">{appointment.name}</p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.phone}</p>
                     </div>
@@ -202,17 +202,17 @@ export default function AppointmentsPage() {
                   {/* Right: Issue Summary */}
                   <div className="lg:col-span-1 space-y-3">
                     <div>
-                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">Issue Summary</p>
+                      <p className="text-xs font-bold uppercase text-gray-500 dark:text-gray-400 tracking-wider mb-1">{t("appointments.issueSummary", "Issue Summary")}</p>
                       <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                         {appointment.issue_summary}
                       </p>
                     </div>
                     <div className="flex gap-2 pt-2">
                       <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors text-sm">
-                        View Details
+                        {t("appointments.viewDetails", "View Details")}
                       </button>
                       <button className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-2 rounded-lg transition-colors text-sm">
-                        Cancel
+                        {t("appointments.cancel", "Cancel")}
                       </button>
                     </div>
                   </div>
@@ -221,7 +221,7 @@ export default function AppointmentsPage() {
                 {/* Divider */}
                 <div className="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4">
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Booked on {new Date(appointment.created_at).toLocaleDateString('en-IN')}
+                    {t("appointments.bookedOn", "Booked on")} {new Date(appointment.created_at).toLocaleDateString('en-IN')}
                   </p>
                 </div>
               </div>
@@ -234,12 +234,12 @@ export default function AppointmentsPage() {
           <div className="flex items-start gap-3">
             <AlertCircle className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <h4 className="font-bold text-gray-900 dark:text-white">Important Information</h4>
+              <h4 className="font-bold text-gray-900 dark:text-white">{t("appointments.important", "Important Information")}</h4>
               <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1 ml-1">
-                <li>✓ Arrive 15 minutes before your scheduled time</li>
-                <li>✓ Bring relevant documents (employment contract, ID, etc.)</li>
-                <li>✓ All consultations are confidential and free</li>
-                <li>✓ Call the center ahead if you need to reschedule</li>
+                <li>{t("appointments.tip1", "✓ Arrive 15 minutes before your scheduled time")}</li>
+                <li>{t("appointments.tip2", "✓ Bring relevant documents (employment contract, ID, etc.)")}</li>
+                <li>{t("appointments.tip3", "✓ All consultations are confidential and free")}</li>
+                <li>{t("appointments.tip4", "✓ Call the center ahead if you need to reschedule")}</li>
               </ul>
             </div>
           </div>

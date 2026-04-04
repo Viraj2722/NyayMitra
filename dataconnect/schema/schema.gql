@@ -23,7 +23,10 @@ type UserQuery @table {
   user: User # Optional (null if anonymous mode)
   queryText: String # Optional (do not save text if anonymous mode is ON)
   detectedLanguage: String!
+  selectedResponseLanguage: String
   legalCategoryDetected: String
+  intakeFollowUpQuestion: String
+  intakeFollowUpAnswer: String
   isUrgent: Boolean! # Drives the 100/181 helpline trigger
   isAnonymous: Boolean! # HUGE WOW FACTOR parameter for judges
   aiResponse: String

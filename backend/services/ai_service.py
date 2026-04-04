@@ -24,8 +24,38 @@ Rules:
 - End with: "You are not alone, help is available near you"
 """
 
-def generate_response(user_input):
-    prompt = f"{SYSTEM_PROMPT}\nUser: {user_input}"
+LANGUAGE_INSTRUCTION_MAP = {
+    "English": "User has selected English. Respond entirely in English regardless of what language they write in.",
+    "Hindi": "User has selected Hindi. Respond entirely in Hindi regardless of what language they write in.",
+    "Marathi": "User has selected Marathi. Respond entirely in Marathi regardless of what language they write in.",
+}
+
+
+def generate_response(user_input, selected_language="English", intake_context=None):
+    language_instruction = LANGUAGE_INSTRUCTION_MAP.get(
+        selected_language,
+        LANGUAGE_INSTRUCTION_MAP["English"],
+    )
+
+    context_block = ""
+    if intake_context:
+        category = intake_context.get("category", "general")
+        follow_up_question = intake_context.get("followUpQuestion", "")
+        follow_up_answer = intake_context.get("followUpAnswer", "")
+        context_block = (
+            f"\nStructured intake context:"
+            f"\n- Category: {category}"
+            f"\n- Follow-up question: {follow_up_question}"
+            f"\n- Follow-up answer: {follow_up_answer}"
+        )
+
+    prompt = (
+        f"{SYSTEM_PROMPT}\n"
+        f"{language_instruction}\n"
+        f"Use the structured context to make the advice specific and practical."
+        f"{context_block}\n"
+        f"User message: {user_input}"
+    )
     try:
         response = model.generate_content(prompt)
         return response.text

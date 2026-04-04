@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Lock, Plus, Activity, FileText, Database, LogOut, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
 
@@ -25,6 +26,7 @@ type QueryRow = {
 };
 
 export default function AdminPage() {
+  const { t } = useLanguage();
   const { user, isAdmin, loading, signInWithEmail, logout } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -41,8 +43,8 @@ export default function AdminPage() {
     setError("");
     try {
       await signInWithEmail(email, password);
-    } catch (err) {
-      setError("Invalid admin credentials");
+    } catch {
+      setError(t("admin.invalidCreds", "Invalid admin credentials"));
     }
   };
 
@@ -80,8 +82,8 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
             <Lock className="w-8 h-8 text-[var(--color-deep-blue)] dark:text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Checking access</h2>
-          <p className="text-gray-500 dark:text-gray-400 text-sm">Verifying your Firebase admin access.</p>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t("admin.checking", "Checking access")}</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm">{t("admin.verifying", "Verifying your Firebase admin access.")}</p>
         </div>
       </div>
     );
@@ -94,7 +96,7 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <Lock className="w-8 h-8 text-[var(--color-deep-blue)] dark:text-blue-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Admin Access</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t("admin.access", "Admin Access")}</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">Protected dashboard for managing centers and monitoring live queries.</p>
           <form onSubmit={handleLogin} className="space-y-4">
             <input
@@ -115,7 +117,7 @@ export default function AdminPage() {
             />
             {error && <p className="text-red-500 dark:text-red-400 text-sm">{error}</p>}
             <button type="submit" className="w-full bg-[var(--color-deep-blue)] text-white font-bold py-3 rounded-xl shadow-md hover:bg-blue-900 transition-colors">
-              Access Dashboard
+              {t("admin.accessDashboard", "Access Dashboard")}
             </button>
           </form>
         </div>
@@ -130,10 +132,10 @@ export default function AdminPage() {
           <div className="w-16 h-16 bg-red-50 dark:bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <ShieldAlert className="w-8 h-8 text-red-600 dark:text-red-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access denied</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">{t("admin.denied", "Access denied")}</h2>
           <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">Your account is signed in, but it is not marked as admin.</p>
           <button onClick={logout} className="w-full bg-black hover:bg-gray-800 text-white font-bold py-3 rounded-xl shadow-md transition-colors">
-            Sign out
+            {t("nav.signOut", "Sign out")}
           </button>
         </div>
       </div>
@@ -149,7 +151,7 @@ export default function AdminPage() {
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-blue-500/10 text-[var(--color-deep-blue)] dark:text-blue-300 text-xs font-bold uppercase tracking-[0.18em] mb-3">
               Admin Console
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">Dashboard Overview</h1>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">{t("admin.overview", "Dashboard Overview")}</h1>
             <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-2xl">Monitor live queries and keep legal centers up to date from one place.</p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -164,7 +166,7 @@ export default function AdminPage() {
             </div>
             <button onClick={logout} className="bg-white dark:bg-zinc-950 px-4 py-3 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-zinc-900 transition-colors">
               <LogOut className="w-4 h-4" />
-              Sign out
+              {t("nav.signOut", "Sign out")}
             </button>
           </div>
         </header>

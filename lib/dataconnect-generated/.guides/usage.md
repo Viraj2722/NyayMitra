@@ -12,14 +12,22 @@ For each operation, there is a wrapper hook that can be used to call the operati
 
 Here are all of the hooks that get generated:
 ```ts
-import { useCreateUser, useCreateAppointment, useCreateUserQuery } from '@dataconnect/my-app/react';
+import { useCreateUser, useGetUserByUid, useUpsertUserProfile, useCreateLegalAidCenter, useCreateUserQuery, useCreateAppointment, useCreateAppointmentWithCenter } from '@dataconnect/my-app/react';
 // The types of these hooks are available in react/index.d.ts
 
 const { data, isPending, isSuccess, isError, error } = useCreateUser(createUserVars);
 
-const { data, isPending, isSuccess, isError, error } = useCreateAppointment(createAppointmentVars);
+const { data, isPending, isSuccess, isError, error } = useGetUserByUid(getUserByUidVars);
+
+const { data, isPending, isSuccess, isError, error } = useUpsertUserProfile(upsertUserProfileVars);
+
+const { data, isPending, isSuccess, isError, error } = useCreateLegalAidCenter(createLegalAidCenterVars);
 
 const { data, isPending, isSuccess, isError, error } = useCreateUserQuery(createUserQueryVars);
+
+const { data, isPending, isSuccess, isError, error } = useCreateAppointment(createAppointmentVars);
+
+const { data, isPending, isSuccess, isError, error } = useCreateAppointmentWithCenter(createAppointmentWithCenterVars);
 
 ```
 
@@ -58,17 +66,29 @@ If a user is not using a supported framework, they can use the generated SDK dir
 Here's an example of how to use it with the first 5 operations:
 
 ```js
-import { createUser, createAppointment, createUserQuery } from '@dataconnect/my-app';
+import { createUser, getUserByUid, upsertUserProfile, createLegalAidCenter, createUserQuery, createAppointment, createAppointmentWithCenter } from '@dataconnect/my-app';
 
 
 // Operation CreateUser:  For variables, look at type CreateUserVars in ../index.d.ts
 const { data } = await CreateUser(dataConnect, createUserVars);
 
-// Operation CreateAppointment:  For variables, look at type CreateAppointmentVars in ../index.d.ts
-const { data } = await CreateAppointment(dataConnect, createAppointmentVars);
+// Operation GetUserByUid:  For variables, look at type GetUserByUidVars in ../index.d.ts
+const { data } = await GetUserByUid(dataConnect, getUserByUidVars);
+
+// Operation UpsertUserProfile:  For variables, look at type UpsertUserProfileVars in ../index.d.ts
+const { data } = await UpsertUserProfile(dataConnect, upsertUserProfileVars);
+
+// Operation CreateLegalAidCenter:  For variables, look at type CreateLegalAidCenterVars in ../index.d.ts
+const { data } = await CreateLegalAidCenter(dataConnect, createLegalAidCenterVars);
 
 // Operation CreateUserQuery:  For variables, look at type CreateUserQueryVars in ../index.d.ts
 const { data } = await CreateUserQuery(dataConnect, createUserQueryVars);
+
+// Operation CreateAppointment:  For variables, look at type CreateAppointmentVars in ../index.d.ts
+const { data } = await CreateAppointment(dataConnect, createAppointmentVars);
+
+// Operation CreateAppointmentWithCenter:  For variables, look at type CreateAppointmentWithCenterVars in ../index.d.ts
+const { data } = await CreateAppointmentWithCenter(dataConnect, createAppointmentWithCenterVars);
 
 
 ```

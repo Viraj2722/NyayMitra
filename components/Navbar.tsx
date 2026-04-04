@@ -1,19 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { Shield, ShieldAlert, LogOut, User as UserIcon, Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
-  const { user, signInWithGoogle, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const { t } = useLanguage();
   const [anonymousMode, setAnonymousMode] = useState(false);
-  const [theme, setTheme] = useState("light");
+  // Keep initial render deterministic to avoid hydration mismatch.
+  const [theme, setTheme] = useState<"light" | "dark">("light");
 
   useEffect(() => {
-    // Check initial system preference or localStorage
-    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      setTheme("dark");
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
       document.documentElement.classList.add("dark");
     }
   }, []);
@@ -44,7 +45,7 @@ export default function Navbar() {
             <button
               onClick={toggleTheme}
               className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
-              title="Toggle Dark Mode"
+              title={t("nav.toggleTheme", "Toggle Dark Mode")}
             >
               {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </button>
@@ -60,12 +61,12 @@ export default function Navbar() {
               {anonymousMode ? (
                 <>
                   <Shield className="w-4 h-4" />
-                  Protected
+                  {t("nav.protected", "Protected")}
                 </>
               ) : (
                 <>
                   <ShieldAlert className="w-4 h-4" />
-                  Anonymous: OFF
+                  {t("nav.anonymousOff", "Anonymous: OFF")}
                 </>
               )}
             </button>
@@ -77,25 +78,25 @@ export default function Navbar() {
                     href="/chat"
                     className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
                   >
-                    Ask
+                    {t("nav.ask", "Ask")}
                   </Link>
                   <Link
                     href="/appointments"
                     className="text-sm text-gray-700 dark:text-gray-200 hover:text-[var(--color-deep-blue)] dark:hover:text-blue-400 font-medium px-3 py-1.5 rounded-md transition-colors"
                   >
-                    Appointments
+                    {t("nav.appointments", "Appointments")}
                   </Link>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 font-medium">
                   <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-[var(--color-deep-blue)] dark:text-blue-400">
                     <UserIcon className="w-4 h-4" />
                   </div>
-                  <span className="hidden sm:inline">{user.displayName || "User"}</span>
+                  <span className="hidden sm:inline">{user.displayName || t("nav.user", "User")}</span>
                 </div>
                 <button
                   onClick={logout}
                   className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-full hover:bg-red-50 dark:hover:bg-red-900/20"
-                  title="Logout"
+                  title={t("nav.signOut", "Sign out")}
                 >
                   <LogOut className="w-5 h-5" />
                 </button>
@@ -105,7 +106,7 @@ export default function Navbar() {
                 href="/login"
                 className="text-[13px] font-semibold text-white bg-[var(--color-deep-blue)] hover:bg-blue-900 dark:bg-blue-600 dark:hover:bg-blue-700 px-4 py-1.5 rounded-md shadow-sm transition-all active:scale-95"
               >
-                Sign In
+                {t("nav.signIn", "Sign In")}
               </Link>
             )}
           </div>

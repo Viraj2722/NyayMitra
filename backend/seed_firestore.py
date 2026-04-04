@@ -1,39 +1,45 @@
 #!/usr/bin/env python3
 """
-Firebase Firestore Dummy Data Seeder
-This script adds sample legal aid centers, queries, and other demo data to Firestore.
-Run this once to populate your database for testing.
+Data Connect Seeder (kept as seed_firestore.py for backward compatibility)
+Seeds sample data into Firebase Data Connect tables via executeMutation API.
 """
 
+import json
 import os
-import firebase_admin
-from firebase_admin import credentials, firestore
-from datetime import datetime, timedelta
+import re
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import date, timedelta
+
 from dotenv import load_dotenv
 
-# Load environment variables
+# Load backend env first, then frontend env for NEXT_PUBLIC_* keys.
 load_dotenv()
+load_dotenv("../.env.local")
+load_dotenv("../.env")
 
-# Initialize Firebase
-firebase_cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
-if not firebase_cred_path or not os.path.exists(firebase_cred_path):
-    print("❌ Error: FIREBASE_CREDENTIALS_PATH not found!")
-    print("   Please ensure firebase_credentials.json is downloaded from Firebase Console")
-    print("   and FIREBASE_CREDENTIALS_PATH is set in .env")
-    exit(1)
+SAMPLE_USERS = [
+    {
+        "uid": "seed-user-001",
+        "name": "Ramesh Kumar",
+        "preferredLanguage": "hi",
+        "mobile": "9876543210",
+    },
+    {
+        "uid": "seed-user-002",
+        "name": "Sita Devi",
+        "preferredLanguage": "en",
+        "mobile": "9898989898",
+    },
+    {
+        "uid": "seed-user-003",
+        "name": "Aarav Patil",
+        "preferredLanguage": "mr",
+        "mobile": "9765432109",
+    },
+]
 
-try:
-    cred = credentials.Certificate(firebase_cred_path)
-    firebase_admin.initialize_app(cred)
-except ValueError:
-    print("Firebase already initialized")
-except Exception as e:
-    print(f"❌ Failed to initialize Firebase: {e}")
-    exit(1)
-
-db = firestore.client()
-
-# Sample Legal Aid Centers
 SAMPLE_CENTERS = [
     {
         "name": "Delhi Women Legal Aid Center",
@@ -44,7 +50,7 @@ SAMPLE_CENTERS = [
         "freeServices": True,
         "categories": ["domestic", "women-rights", "harassment"],
         "timings": "Mon-Fri 10AM-6PM, Sat 10AM-2PM",
-        "description": "Specializes in women's legal issues including domestic violence, harassment, and family law."
+        "description": "Specializes in women's legal issues including domestic violence, harassment, and family law.",
     },
     {
         "name": "Labor Rights Collective - Mumbai",
@@ -55,7 +61,7 @@ SAMPLE_CENTERS = [
         "freeServices": True,
         "categories": ["labor", "workers-rights", "wage-disputes"],
         "timings": "Mon-Fri 9AM-5PM, Sat 9AM-1PM",
-        "description": "NGO dedicated to protecting workers' rights, handling wage disputes, workplace harassment, and employment contracts."
+        "description": "NGO dedicated to protecting workers' rights, handling wage disputes and workplace harassment.",
     },
     {
         "name": "Tenant Rights Foundation - Bangalore",
@@ -66,226 +72,231 @@ SAMPLE_CENTERS = [
         "freeServices": True,
         "categories": ["tenancy", "property", "eviction"],
         "timings": "Tue-Sat 11AM-7PM",
-        "description": "Supports tenants in property disputes, provides free legal consultation for eviction and rental agreement issues."
-    },
-    {
-        "name": "Legal Aid for All - Chennai",
-        "address": "789 Marina Drive, Chennai, Tamil Nadu",
-        "phone": "+91-44-2847-5555",
-        "latitude": 13.0499,
-        "longitude": 80.2824,
-        "freeServices": True,
-        "categories": ["consumer", "criminal", "civil"],
-        "timings": "Mon-Fri 10AM-6PM",
-        "description": "Provides comprehensive free legal aid services for consumer disputes, criminal law, and general civil matters."
-    },
-    {
-        "name": "LGBTQ+ Legal Support Network - Kolkata",
-        "address": "321 Park Circus, Kolkata, West Bengal",
-        "phone": "+91-33-2214-4444",
-        "latitude": 22.5726,
-        "longitude": 88.3639,
-        "freeServices": True,
-        "categories": ["lgbtq", "discrimination", "family-law"],
-        "timings": "Wed-Sat 2PM-8PM, Emergency 24/7",
-        "description": "Dedicated support for LGBTQ+ legal issues including discrimination, family law, and documentation changes. 24/7 emergency hotline."
-    },
-    {
-        "name": "Senior Citizen Legal Advisor - Pune",
-        "address": "654 Kalyani Nagar, Pune, Maharashtra",
-        "phone": "+91-20-6789-7777",
-        "latitude": 18.5204,
-        "longitude": 73.8567,
-        "freeServices": True,
-        "categories": ["elderly", "pension", "inheritance", "abuse"],
-        "timings": "Mon-Fri 9AM-4PM",
-        "description": "Specializes in legal issues affecting senior citizens including pension disputes, inheritance, and elder abuse cases."
+        "description": "Supports tenants in property disputes and eviction cases.",
     },
 ]
 
-# Sample Queries/Cases
 SAMPLE_QUERIES = [
     {
-        "translated_keywords": "Workplace harassment from manager",
-        "language": "en",
-        "category": "labor",
-        "urgency": "high",
+        "queryText": "My employer has not paid salary for 3 months",
+        "detectedLanguage": "en",
+        "legalCategoryDetected": "labor",
+        "isUrgent": True,
         "isAnonymous": False,
-        "created_at": datetime.utcnow() - timedelta(hours=2)
+        "aiResponse": "You can file a wage claim under labor protections and approach legal aid immediately.",
     },
     {
-        "translated_keywords": "Landlord refusing to return security deposit",
-        "language": "en",
-        "category": "tenancy",
-        "urgency": "normal",
-        "isAnonymous": False,
-        "created_at": datetime.utcnow() - timedelta(hours=6)
-    },
-    {
-        "translated_keywords": "Domestic violence seeking shelter",
-        "language": "hi",
-        "category": "domestic",
-        "urgency": "high",
+        "queryText": "Mera landlord mujhe ghar se nikal raha hai bina notice",
+        "detectedLanguage": "hi",
+        "legalCategoryDetected": "tenancy",
+        "isUrgent": False,
         "isAnonymous": True,
-        "created_at": datetime.utcnow() - timedelta(hours=1)
+        "aiResponse": "Bina proper notice eviction illegal ho sakta hai. Rent records collect karein.",
     },
     {
-        "translated_keywords": "Wage deduction without notice",
-        "language": "ta",
-        "category": "labor",
-        "urgency": "normal",
-        "isAnonymous": False,
-        "created_at": datetime.utcnow() - timedelta(days=1)
-    },
-    {
-        "translated_keywords": "Consumer fraud - defective product not replaced",
-        "language": "en",
-        "category": "consumer",
-        "urgency": "low",
-        "isAnonymous": False,
-        "created_at": datetime.utcnow() - timedelta(days=2)
-    },
-    {
-        "translated_keywords": "Facing discrimination at workplace due to sexual orientation",
-        "language": "en",
-        "category": "lgbtq",
-        "urgency": "high",
+        "queryText": "Facing domestic violence and need help",
+        "detectedLanguage": "en",
+        "legalCategoryDetected": "domestic",
+        "isUrgent": True,
         "isAnonymous": True,
-        "created_at": datetime.utcnow() - timedelta(days=1, hours=12)
-    },
-    {
-        "translated_keywords": "Father refusing pension transfer after mother's death",
-        "language": "mr",
-        "category": "elderly",
-        "urgency": "normal",
-        "isAnonymous": False,
-        "created_at": datetime.utcnow() - timedelta(hours=3)
+        "aiResponse": "Call 181 or 100 immediately and seek protective legal assistance.",
     },
 ]
 
-def seed_centers():
-    """Add sample legal aid centers to Firestore"""
-    print("\n📍 Seeding Legal Aid Centers...")
-    batch = db.batch()
-    
-    for i, center in enumerate(SAMPLE_CENTERS):
-        ref = db.collection("centers").document()
-        batch.set(ref, {
-            **center,
-            "createdAt": datetime.utcnow(),
-            "updatedAt": datetime.utcnow()
-        })
-        print(f"   ✓ Added: {center['name']}")
-    
-    batch.commit()
-    print(f"✅ Added {len(SAMPLE_CENTERS)} legal aid centers")
 
-def seed_queries():
-    """Add sample queries to Firestore"""
-    print("\n📋 Seeding Sample Queries...")
-    batch = db.batch()
-    
-    for i, query in enumerate(SAMPLE_QUERIES):
-        ref = db.collection("queries").document()
-        batch.set(ref, query)
-        print(f"   ✓ Added query: {query['category']}")
-    
-    batch.commit()
-    print(f"✅ Added {len(SAMPLE_QUERIES)} sample queries")
+class DataConnectClient:
+    def __init__(self) -> None:
+        self.project_id = os.getenv("NEXT_PUBLIC_FIREBASE_PROJECT_ID", "").strip().strip('"')
+        self.api_key = os.getenv("NEXT_PUBLIC_FIREBASE_API_KEY", "").strip().strip('"')
 
-def seed_categories():
-    """Add legal categories reference data"""
-    print("\n📚 Seeding Legal Categories...")
-    categories = {
-        "labor": {
-            "name": "Labor & Workers' Rights",
-            "description": "Workplace disputes, wage issues, contract violations",
-            "helpline": "1800-11-4141"
-        },
-        "domestic": {
-            "name": "Domestic & Family Law",
-            "description": "Domestic violence, divorce, custody, inheritance",
-            "helpline": "181"
-        },
-        "tenancy": {
-            "name": "Tenancy & Property",
-            "description": "Eviction, rental disputes, property rights",
-            "helpline": "1800-33-5555"
-        },
-        "consumer": {
-            "name": "Consumer Rights",
-            "description": "Defective products, fraud, unfair trade practices",
-            "helpline": "1800-11-4000"
-        },
-        "criminal": {
-            "name": "Criminal Law",
-            "description": "Criminal charges, bail, FIR filing",
-            "helpline": "100"
-        },
-        "lgbtq": {
-            "name": "LGBTQ+ Rights",
-            "description": "Discrimination, family law, documentation",
-            "helpline": "1800-77-7777"
-        },
-        "elderly": {
-            "name": "Elderly Care & Rights",
-            "description": "Pension, insurance, elder abuse, inheritance",
-            "helpline": "1800-55-5555"
-        },
-        "women-rights": {
-            "name": "Women's Rights",
-            "description": "Gender discrimination, harassment, women's safety",
-            "helpline": "1800-22-2222"
-        },
-    }
-    
-    for cat_id, cat_data in categories.items():
-        db.collection("categories").document(cat_id).set(cat_data)
-        print(f"   ✓ Added: {cat_data['name']}")
-    
-    print(f"✅ Added {len(categories)} legal categories")
+        dataconnect_config = self._read_file("../dataconnect/dataconnect.yaml")
+        connector_config = self._read_file("../dataconnect/example/connector.yaml")
 
-def main():
-    """Main seeding function"""
-    print("\n" + "="*50)
-    print("🌱 NyayMitra Firestore Seeder")
-    print("="*50)
-    
+        self.location = self._extract_yaml_value(dataconnect_config, "location")
+        self.service_id = self._extract_yaml_value(dataconnect_config, "serviceId")
+        self.connector_id = self._extract_yaml_value(connector_config, "connectorId")
+
+        if not self.project_id or not self.api_key:
+            raise ValueError(
+                "Missing NEXT_PUBLIC_FIREBASE_PROJECT_ID or NEXT_PUBLIC_FIREBASE_API_KEY. "
+                "Ensure they are in .env.local"
+            )
+
+        if not self.location or not self.service_id or not self.connector_id:
+            raise ValueError("Could not read Data Connect location/service/connector from dataconnect/*.yaml")
+
+        self.resource_name = (
+            f"projects/{self.project_id}/locations/{self.location}/"
+            f"services/{self.service_id}/connectors/{self.connector_id}"
+        )
+        self.endpoint = (
+            f"https://firebasedataconnect.googleapis.com/v1/{self.resource_name}:executeMutation"
+            f"?key={urllib.parse.quote(self.api_key)}"
+        )
+
+    @staticmethod
+    def _read_file(path: str) -> str:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    @staticmethod
+    def _extract_yaml_value(content: str, key: str) -> str:
+        match = re.search(rf'^{re.escape(key)}:\s*"?([^"\n]+)"?', content, re.MULTILINE)
+        return match.group(1).strip() if match else ""
+
+    def execute_mutation(self, operation_name: str, variables: dict) -> dict:
+        payload = {
+            "name": self.resource_name,
+            "operationName": operation_name,
+            "variables": variables,
+        }
+
+        req = urllib.request.Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                body = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            raw = e.read().decode("utf-8", errors="ignore")
+            raise RuntimeError(f"HTTP {e.code}: {raw}") from e
+
+        if body.get("errors"):
+            first_error = body["errors"][0]
+            message = first_error.get("message", str(first_error))
+            raise RuntimeError(message)
+
+        return body.get("data", {})
+
+
+def seed_users(dc: DataConnectClient) -> None:
+    print("\n👤 Seeding users into Data Connect...")
+    inserted = 0
+
+    for user in SAMPLE_USERS:
+        try:
+            dc.execute_mutation("CreateUser", user)
+            inserted += 1
+            print(f"   ✓ {user['name']}")
+        except Exception as e:
+            print(f"   ⚠️ Skipped user {user['uid']}: {e}")
+
+    print(f"✅ Users inserted: {inserted}/{len(SAMPLE_USERS)}")
+
+
+def seed_centers(dc: DataConnectClient) -> list:
+    print("\n📍 Seeding legal aid centers into Data Connect...")
+    inserted_center_ids = []
+
+    for center in SAMPLE_CENTERS:
+        try:
+            data = dc.execute_mutation("CreateLegalAidCenter", center)
+            center_id = (
+                data.get("legalAidCenter_insert", {}).get("id")
+                if isinstance(data, dict)
+                else None
+            )
+            if center_id:
+                inserted_center_ids.append(center_id)
+            print(f"   ✓ {center['name']}")
+        except Exception as e:
+            print(f"   ⚠️ Could not insert center '{center['name']}': {e}")
+            print("      Hint: Deploy latest dataconnect/example/mutations.gql first.")
+            break
+
+    print(f"✅ Center inserts attempted: {len(SAMPLE_CENTERS)}")
+    return inserted_center_ids
+
+
+def seed_queries(dc: DataConnectClient) -> None:
+    print("\n📋 Seeding user queries into Data Connect...")
+    inserted = 0
+
+    for query in SAMPLE_QUERIES:
+        try:
+            dc.execute_mutation("CreateUserQuery", query)
+            inserted += 1
+            print(f"   ✓ {query['legalCategoryDetected']} query")
+        except Exception as e:
+            print(f"   ⚠️ Skipped query '{query['queryText'][:24]}...': {e}")
+
+    print(f"✅ Queries inserted: {inserted}/{len(SAMPLE_QUERIES)}")
+
+
+def seed_appointments(dc: DataConnectClient, center_ids: list) -> None:
+    print("\n📅 Seeding appointments into Data Connect...")
+
+    if not center_ids:
+        print("   ⚠️ No center IDs available, skipping appointment seed.")
+        return
+
+    appointment_seed = [
+        {
+            "userId": None,
+            "legalAidCenterId": center_ids[0],
+            "userName": "Ramesh Kumar",
+            "userContact": "9876543210",
+            "problemSummary": "Pending wage dispute with employer.",
+            "preferredDate": str(date.today() + timedelta(days=3)),
+            "preferredTime": "11:00",
+            "status": "pending",
+        },
+        {
+            "userId": None,
+            "legalAidCenterId": center_ids[min(1, len(center_ids) - 1)],
+            "userName": "Sita Devi",
+            "userContact": "9898989898",
+            "problemSummary": "Domestic safety and legal consultation required.",
+            "preferredDate": str(date.today() + timedelta(days=4)),
+            "preferredTime": "14:30",
+            "status": "pending",
+        },
+    ]
+
+    inserted = 0
+    for appointment in appointment_seed:
+        try:
+            dc.execute_mutation("CreateAppointmentWithCenter", appointment)
+            inserted += 1
+            print(f"   ✓ {appointment['userName']} -> {appointment['preferredDate']}")
+        except Exception as e:
+            print(f"   ⚠️ Skipped appointment for {appointment['userName']}: {e}")
+
+    print(f"✅ Appointments inserted: {inserted}/{len(appointment_seed)}")
+
+
+def main() -> None:
+    print("\n" + "=" * 58)
+    print("🌱 NyayMitra Data Connect Seeder")
+    print("=" * 58)
+
     try:
-        # Check if data already exists
-        centers_list = list(db.collection("centers").stream())
-        centers_count = len(centers_list)
-        if centers_count > 0:
-            print(f"\n⚠️  Found {centers_count} existing centers!")
-            response = input("   Do you want to clear and reseed? (yes/no): ").strip().lower()
-            if response == "yes":
-                print("   Clearing existing centers...")
-                for doc in db.collection("centers").stream():
-                    doc.reference.delete()
-                for doc in db.collection("queries").stream():
-                    doc.reference.delete()
-                print("   ✓ Cleared")
-            else:
-                print("   Skipping seed. Exiting.")
-                return
-        
-        seed_centers()
-        seed_queries()
-        seed_categories()
-        
-        print("\n" + "="*50)
-        print("✅ Firestore Seeding Complete!")
-        print("="*50)
-        print("\n📊 Your database is now ready with:")
-        print(f"   • {len(SAMPLE_CENTERS)} Legal Aid Centers")
-        print(f"   • {len(SAMPLE_QUERIES)} Sample Queries")
-        print(f"   • 8 Legal Categories")
-        print("\n🚀 You can now run the app and see live data!")
-        
+        dc = DataConnectClient()
+
+        print("\n🔧 Target:")
+        print(f"   Project  : {dc.project_id}")
+        print(f"   Location : {dc.location}")
+        print(f"   Service  : {dc.service_id}")
+        print(f"   Connector: {dc.connector_id}")
+
+        seed_users(dc)
+        center_ids = seed_centers(dc)
+        seed_queries(dc)
+        seed_appointments(dc, center_ids)
+
+        print("\n" + "=" * 58)
+        print("✅ Data Connect seeding finished")
+        print("=" * 58)
+        print("\nIf center insertion failed, deploy latest Data Connect operations:")
+        print("   firebase deploy --only dataconnect")
+
     except Exception as e:
-        print(f"\n❌ Error during seeding: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"\n❌ Error during Data Connect seeding: {e}")
+
 
 if __name__ == "__main__":
     main()

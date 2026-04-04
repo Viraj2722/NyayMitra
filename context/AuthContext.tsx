@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
 import { syncUserToDataConnect } from "@/lib/dataConnect";
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut, signInWithEmailAndPassword } from "firebase/auth";
+import { LANGUAGE_STORAGE_KEY, type AppLanguage } from "@/context/LanguageContext";
 
 const ADMIN_EMAIL = "admin@example.com";
 
@@ -32,6 +33,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const getPreferredLanguage = (): AppLanguage => {
+    if (typeof window === "undefined") return "English";
+    const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY) as AppLanguage | null;
+    return saved || "English";
+  };
+
   useEffect(() => {
     let active = true;
 
@@ -53,7 +60,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await syncUserToDataConnect({
           uid: currentUser.uid,
           name: currentUser.displayName || "Admin",
-          preferredLanguage: "English",
+          preferredLanguage: getPreferredLanguage(),
           mobile: currentUser.phoneNumber || undefined
         });
         setLoading(false);
@@ -76,12 +83,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const result = await signInWithPopup(auth, provider);
       // Data Connect Mapping
       if (result.user) {
-        const mobile = window.prompt("Enter your mobile number to save with your account") || "";
         await syncUserToDataConnect({
           uid: result.user.uid,
           name: result.user.displayName || "Unknown",
-          preferredLanguage: "English",
-          mobile
+          preferredLanguage: getPreferredLanguage(),
+          mobile: result.user.phoneNumber || undefined
         });
         setUser(result.user);
         setIsAdmin(result.user.email === ADMIN_EMAIL);
@@ -119,8 +125,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         await syncUserToDataConnect({
           uid: result.user.uid,
           name: name,
-          preferredLanguage: "English",
-          mobile: result.user.phoneNumber || undefined
+          preferredLanguage: getPreferredLanguage(),
+          mobile: mobile || result.user.phoneNumber || undefined
         });
       }
     } catch (error) {

@@ -4,10 +4,12 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { ShieldAlert } from "lucide-react";
 
 export default function SignupPage() {
   const { registerWithEmail, signInWithGoogle } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   
   const [name, setName] = useState("");
@@ -24,11 +26,12 @@ export default function SignupPage() {
     try {
       await registerWithEmail(email, password, name, mobile);
       router.push("/");
-    } catch (err: any) {
-      if (err.code === "auth/email-already-in-use") {
-        setError("This email is already registered. Please log in.");
+    } catch (err: unknown) {
+      const maybeAuthError = err as { code?: string };
+      if (maybeAuthError.code === "auth/email-already-in-use") {
+        setError(t("signup.emailExists", "This email is already registered. Please log in."));
       } else {
-        setError("Failed to create an account. Please try again.");
+        setError(t("signup.failed", "Failed to create an account. Please try again."));
       }
     } finally {
       setIsLoading(false);
@@ -39,8 +42,8 @@ export default function SignupPage() {
     try {
       await signInWithGoogle();
       router.push("/");
-    } catch (err) {
-      setError("Google sign up failed.");
+    } catch {
+      setError(t("signup.googleFailed", "Google sign up failed."));
     }
   };
 
@@ -52,8 +55,8 @@ export default function SignupPage() {
           <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/20 mb-3">
             <ShieldAlert className="w-5 h-5 text-[var(--color-saffron)]" />
           </div>
-          <h1 className="text-xl font-extrabold text-zinc-900 dark:text-white mb-1">Create Account</h1>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">Join NyayMitra to securely access legal aid</p>
+          <h1 className="text-xl font-extrabold text-zinc-900 dark:text-white mb-1">{t("signup.title", "Create Account")}</h1>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">{t("signup.subtitle", "Join NyayMitra to securely access legal aid")}</p>
         </div>
 
         {error && (
@@ -64,7 +67,7 @@ export default function SignupPage() {
 
         <form onSubmit={handleSignup} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Full Name</label>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">{t("signup.fullName", "Full Name")}</label>
             <input
               type="text"
               value={name}
@@ -75,7 +78,7 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">{t("auth.email", "Email Address")}</label>
             <input
               type="email"
               value={email}
@@ -86,7 +89,7 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Mobile Number</label>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">{t("signup.mobile", "Mobile Number")}</label>
             <input
               type="tel"
               value={mobile}
@@ -97,7 +100,7 @@ export default function SignupPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Create Password</label>
+            <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">{t("signup.createPassword", "Create Password")}</label>
             <input
               type="password"
               value={password}
@@ -114,13 +117,13 @@ export default function SignupPage() {
             disabled={isLoading}
             className="w-full bg-[var(--color-saffron)] hover:bg-orange-600 text-white font-bold py-2 rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-70 disabled:active:scale-100 mt-2 text-sm"
           >
-            {isLoading ? "Creating Account..." : "Create Account"}
+            {isLoading ? t("signup.creating", "Creating Account...") : t("signup.title", "Create Account")}
           </button>
         </form>
 
         <div className="my-4 flex items-center gap-3">
           <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
-          <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-bold uppercase">Or continue with</span>
+          <span className="text-zinc-400 dark:text-zinc-500 text-[10px] font-bold uppercase">{t("auth.orContinue", "Or continue with")}</span>
           <div className="h-px bg-zinc-200 dark:bg-zinc-800 flex-1"></div>
         </div>
 
@@ -139,9 +142,9 @@ export default function SignupPage() {
         </button>
 
         <p className="text-center text-zinc-600 dark:text-zinc-400 text-xs font-medium">
-          Already have an account?{" "}
+          {t("signup.haveAccount", "Already have an account?")}{" "}
           <Link href="/login" className="text-[var(--color-deep-blue)] dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-bold ml-1 transition-colors">
-            Sign In
+            {t("auth.signIn", "Sign In")}
           </Link>
         </p>
 

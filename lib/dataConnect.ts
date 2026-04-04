@@ -13,12 +13,13 @@
 
 import { app } from "@/lib/firebase";
 import { getDataConnect } from "firebase/data-connect";
-import { createUser, createAppointment, connectorConfig } from "@/lib/dataconnect-generated";
+import { createAppointment, connectorConfig, createUser, getUserByUid, upsertUserProfile } from "@/lib/dataconnect-generated";
 
 // Initialize Data Connect using the officially generated Connector Config
 const dataConnect = getDataConnect(app, connectorConfig);
 
 export interface User {
+  id?: string;
   uid: string;
   name?: string;
   preferredLanguage?: string;
@@ -69,15 +70,41 @@ export interface Appointment extends AppointmentInput {
 export const syncUserToDataConnect = async (user: User) => {
   console.log("🟢 [Data Connect] Sending User to PostgreSQL DB:", user);
   try {
-    const res = await createUser(dataConnect, {
+    const existing = await getUserByUid(dataConnect, { uid: user.uid });
+    const existingRecord = existing?.data?.users?.[0] || null;
+
+    if (!existingRecord) {
+      const created = await createUser(dataConnect, {
+        uid: user.uid,
+        name: user.name || "Anonymous",
+        preferredLanguage: user.preferredLanguage || "English",
+        mobile: user.mobile || null,
+      });
+      console.log("✅ Data Connect User Created:", created);
+      return;
+    }
+
+    const shouldUpdate =
+      (user.name ?? "Anonymous") !== (existingRecord.name ?? "Anonymous") ||
+      (user.preferredLanguage ?? "English") !== (existingRecord.preferredLanguage ?? "English") ||
+      (user.mobile ?? null) !== (existingRecord.mobile ?? null);
+
+    if (!shouldUpdate) {
+      console.log("✅ Data Connect User Already Up-to-date");
+      return;
+    }
+
+    const updated = await upsertUserProfile(dataConnect, {
+      id: existingRecord.id,
       uid: user.uid,
       name: user.name || "Anonymous",
-      preferredLanguage: user.preferredLanguage || "en",
-      mobile: user.mobile || null
+      preferredLanguage: user.preferredLanguage || "English",
+      mobile: user.mobile || null,
     });
-    console.log("✅ Data Connect Success:", res);
+    console.log("✅ Data Connect User Updated:", updated);
   } catch (err) {
-    console.error("❌ Failed DataConnect User Insert:", err);
+    console.error("❌ Failed DataConnect User Sync:", err);
+    throw err;
   }
 };
 
@@ -116,5 +143,15 @@ export const createUserQueryDataConnect = async (query: {
   } catch (err) {
     console.error("❌ Failed DataConnect Query Insert:", err);
     return false;
+  }
+};
+
+export const getUserProfileByUid = async (uid: string) => {
+  try {
+    const result = await getUserByUid(dataConnect, { uid });
+    return result?.data?.users?.[0] || null;
+  } catch (error) {
+    console.error("❌ Failed to fetch user profile:", error);
+    return null;
   }
 };

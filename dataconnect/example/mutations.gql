@@ -1,106 +1,135 @@
-mutation CreateUser($uid: String!, $name: String, $preferredLanguage: String, $mobile: String) @auth(level: PUBLIC) {
-  user_insert(data: {
-    uid: $uid,
-    name: $name,
-    preferredLanguage: $preferredLanguage,
-    mobile: $mobile
-  })
-}
-
-mutation CreateAppointment(
-  $userId: String,
-  $legalAidCenterId: String!,
-  $userName: String!,
-  $userContact: String!,
-  $problemSummary: String!,
-  $preferredDate: Date!,
-  $preferredTime: String,
-  $status: String!
-) @auth(level: PUBLIC) {
-  appointment_insert(data: {
-    userId: $userId,
-    legalAidCenterId: $legalAidCenterId,
-    userName: $userName,
-    userContact: $userContact,
-    problemSummary: $problemSummary,
-    preferredDate: $preferredDate,
-    preferredTime: $preferredTime,
-    status: $status
-  })
-}
-
-query ListCenters @auth(level: PUBLIC) {
-  legalAidCenterCollection {
-    edges {
-      node {
-        id
-        name
-        address
-        phone
-        latitude
-        longitude
-        freeServices
-        categories
-        timings
-        description
-      }
+mutation CreateUser($uid: String!, $name: String, $preferredLanguage: String, $mobile: String, $role: String @retired) @auth(level: PUBLIC) {
+  user_insert(
+    data: {
+      uid: $uid
+      name: $name
+      preferredLanguage: $preferredLanguage
+      mobile: $mobile
     }
+  )
+}
+
+query GetUserByUid($uid: String!) @auth(level: PUBLIC) {
+  users(where: { uid: { eq: $uid } }, limit: 1) {
+    id
+    uid
+    name
+    preferredLanguage
+    mobile
   }
 }
 
-query ListAppointmentsByCenter($centerId: String!) @auth(level: PUBLIC) {
-  appointmentCollection(where: { legalAidCenterId: { eq: $centerId } }, orderBy: { preferredDate: Desc }) {
-    edges {
-      node {
-        id
-        userName
-        userContact
-        problemSummary
-        preferredDate
-        preferredTime
-        status
-        createdAt
-      }
+mutation UpsertUserProfile(
+  $id: UUID
+  $uid: String!
+  $name: String
+  $preferredLanguage: String
+  $mobile: String
+) @auth(level: PUBLIC) {
+  user_upsert(
+    data: {
+      id: $id
+      uid: $uid
+      name: $name
+      preferredLanguage: $preferredLanguage
+      mobile: $mobile
     }
-  }
+  )
 }
 
-mutation CreateQuery(
-  $userId: String,
-  $queryText: String,
-  $detectedLanguage: String!,
-  $legalCategoryDetected: String,
-  $isUrgent: Boolean!,
-  $isAnonymous: Boolean!,
-  $aiResponse: String
+mutation CreateLegalAidCenter(
+  $name: String!
+  $address: String!
+  $phone: String!
+  $latitude: Float!
+  $longitude: Float!
+  $freeServices: Boolean!
+  $categories: [String!]!
+  $timings: String
+  $description: String
 ) @auth(level: PUBLIC) {
-  userQuery_insert(data: {
-    userId: $userId,
-    queryText: $queryText,
-    detectedLanguage: $detectedLanguage,
-    legalCategoryDetected: $legalCategoryDetected,
-    isUrgent: $isUrgent,
-    isAnonymous: $isAnonymous,
-    aiResponse: $aiResponse
-  })
+  legalAidCenter_insert(
+    data: {
+      name: $name
+      address: $address
+      phone: $phone
+      latitude: $latitude
+      longitude: $longitude
+      freeServices: $freeServices
+      categories: $categories
+      timings: $timings
+      description: $description
+    }
+  )
 }
 
 mutation CreateUserQuery(
+  $userId: UUID
   $queryText: String
   $detectedLanguage: String!
+  $selectedResponseLanguage: String
   $legalCategoryDetected: String
+  $intakeFollowUpQuestion: String
+  $intakeFollowUpAnswer: String
   $isUrgent: Boolean!
   $isAnonymous: Boolean!
   $aiResponse: String
 ) @auth(level: PUBLIC) {
   userQuery_insert(
     data: {
+      userId: $userId
       queryText: $queryText
       detectedLanguage: $detectedLanguage
+      selectedResponseLanguage: $selectedResponseLanguage
       legalCategoryDetected: $legalCategoryDetected
+      intakeFollowUpQuestion: $intakeFollowUpQuestion
+      intakeFollowUpAnswer: $intakeFollowUpAnswer
       isUrgent: $isUrgent
       isAnonymous: $isAnonymous
       aiResponse: $aiResponse
+    }
+  )
+}
+
+mutation CreateAppointment(
+  $userName: String!
+  $userContact: String!
+  $problemSummary: String!
+  $preferredDate: Date!
+  $status: String!
+) @auth(level: PUBLIC) {
+  appointment_insert(
+    data: {
+      userName: $userName
+      userContact: $userContact
+      problemSummary: $problemSummary
+      preferredDate: $preferredDate
+      status: $status
+      legalAidCenterId: "d69b3074-6725-4b08-8e8e-d95c47be73a1"
+    }
+  )
+}
+
+mutation CreateAppointmentWithCenter(
+  $userId: UUID
+  $legalAidCenterId: UUID!
+  $userName: String!
+  $userContact: String!
+  $problemSummary: String!
+  $preferredDate: Date!
+  $preferredTime: String
+  $status: String!
+) @auth(level: PUBLIC) {
+  appointment_insert(
+    data: {
+      userId: $userId
+      legalAidCenterId: $legalAidCenterId
+      userName: $userName
+      userContact: $userContact
+      problemSummary: $problemSummary
+      preferredDate: $preferredDate
+      preferredTime: $preferredTime
+      status: $status
     }
   )
 }

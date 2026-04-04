@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import { MessageCircle, Scale, Users, FileText } from "lucide-react";
+import { useLanguage, type AppLanguage } from "@/context/LanguageContext";
 
 export default function Home() {
+  const { language, setLanguage, t } = useLanguage();
+
   return (
     <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 dark:bg-zinc-950 relative overflow-y-auto overflow-x-hidden px-4">
       {/* Background decorations */}
@@ -11,20 +16,43 @@ export default function Home() {
       </div>
 
       <main className="z-10 flex flex-col items-center text-center w-full max-w-5xl py-4 md:py-8">
+        <div className="w-full max-w-xl mb-6">
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">{t("chat.pickLanguage", "Choose your language")}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {([
+              "English",
+              "Hindi",
+              "Marathi",
+            ] as AppLanguage[]).map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setLanguage(lang)}
+                className={`py-3 rounded-xl font-bold transition-colors ${
+                  language === lang
+                    ? "bg-[var(--color-deep-blue)] text-white"
+                    : "bg-white dark:bg-zinc-900 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-zinc-700"
+                }`}
+              >
+                {lang === "English" ? "English" : lang === "Hindi" ? "हिन्दी" : "मराठी"}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-[var(--color-deep-blue)] text-sm font-semibold mb-6 lg:mb-8 border border-blue-100 shadow-sm">
           <Scale className="w-4 h-4" />
-          Free & Accessible Legal Aid
+          {t("home.badge", "Free & Accessible Legal Aid")}
         </div>
 
         <h1 className="text-3xl md:text-5xl lg:text-5xl font-extrabold text-[#111] dark:text-white tracking-tight mb-4 leading-tight">
-          You don't have to face your <br className="hidden md:block"/>
+          {t("home.title1", "You don't have to face your")} <br className="hidden md:block"/>
           <span className="text-[var(--color-saffron)] px-1 relative">
-            legal battles alone
+            {t("home.title2", "legal battles alone")}
           </span>
         </h1>
         
         <p className="text-base md:text-lg text-gray-600 dark:text-gray-300 mb-8 max-w-2xl font-light">
-          We simplify complex legal language, connect you with authorized legal aid centers, and protect your rights. Free, confidential, and completely in your language.
+          {t("home.subtitle", "We simplify complex legal language, connect you with authorized legal aid centers, and protect your rights. Free, confidential, and completely in your language.")}
         </p>
 
         <Link 
@@ -32,7 +60,7 @@ export default function Home() {
           className="group flex items-center gap-3 bg-[var(--color-deep-blue)] text-white px-8 py-4 rounded-full text-lg md:text-xl font-semibold shadow-xl shadow-blue-900/20 hover:bg-blue-900 hover:scale-105 active:scale-95 transition-all duration-300"
         >
           <MessageCircle className="w-6 h-6 group-hover:rotate-12 transition-transform" />
-          Describe Your Problem
+          {t("home.cta", "Describe Your Problem")}
         </Link>
         
         <div className="mt-10 lg:mt-16 w-full grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl">
@@ -41,21 +69,21 @@ export default function Home() {
               <Users className="w-5 h-5 text-[var(--color-saffron)]" />
             </div>
             <h3 className="text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white mb-1">1.4B</h3>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Citizens Enabled</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("home.stat1", "Citizens Enabled")}</p>
           </div>
           <div className="flex flex-col items-center p-6 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 transition-transform hover:-translate-y-1">
             <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mb-3">
               <Scale className="w-5 h-5 text-[var(--color-deep-blue)] dark:text-blue-400" />
             </div>
             <h3 className="text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white mb-1">1.5M</h3>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Lawyers in India</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("home.stat2", "Lawyers in India")}</p>
           </div>
           <div className="flex flex-col items-center p-6 bg-white/70 dark:bg-zinc-900/70 backdrop-blur-sm rounded-3xl shadow-sm border border-gray-100 dark:border-zinc-800 transition-transform hover:-translate-y-1">
             <div className="w-10 h-10 rounded-full bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center mb-3">
               <FileText className="w-5 h-5 text-[var(--color-saffron)]" />
             </div>
             <h3 className="text-2xl lg:text-3xl font-extrabold text-gray-900 dark:text-white mb-1">100%</h3>
-            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Free Guidance</p>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t("home.stat3", "Free Guidance")}</p>
           </div>
         </div>
       </main>

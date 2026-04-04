@@ -1,4 +1,4 @@
-import { ConnectorConfig, DataConnect, MutationRef, MutationPromise } from 'firebase/data-connect';
+import { ConnectorConfig, DataConnect, QueryRef, QueryPromise, ExecuteQueryOptions, MutationRef, MutationPromise } from 'firebase/data-connect';
 
 export const connectorConfig: ConnectorConfig;
 
@@ -27,6 +27,37 @@ export interface CreateAppointmentVariables {
   status: string;
 }
 
+export interface CreateAppointmentWithCenterData {
+  appointment_insert: Appointment_Key;
+}
+
+export interface CreateAppointmentWithCenterVariables {
+  userId?: UUIDString | null;
+  legalAidCenterId: UUIDString;
+  userName: string;
+  userContact: string;
+  problemSummary: string;
+  preferredDate: DateString;
+  preferredTime?: string | null;
+  status: string;
+}
+
+export interface CreateLegalAidCenterData {
+  legalAidCenter_insert: LegalAidCenter_Key;
+}
+
+export interface CreateLegalAidCenterVariables {
+  name: string;
+  address: string;
+  phone: string;
+  latitude: number;
+  longitude: number;
+  freeServices: boolean;
+  categories: string[];
+  timings?: string | null;
+  description?: string | null;
+}
+
 export interface CreateUserData {
   user_insert: User_Key;
 }
@@ -36,9 +67,13 @@ export interface CreateUserQueryData {
 }
 
 export interface CreateUserQueryVariables {
+  userId?: UUIDString | null;
   queryText?: string | null;
   detectedLanguage: string;
+  selectedResponseLanguage?: string | null;
   legalCategoryDetected?: string | null;
+  intakeFollowUpQuestion?: string | null;
+  intakeFollowUpAnswer?: string | null;
   isUrgent: boolean;
   isAnonymous: boolean;
   aiResponse?: string | null;
@@ -51,9 +86,35 @@ export interface CreateUserVariables {
   mobile?: string | null;
 }
 
+export interface GetUserByUidData {
+  users: ({
+    id: UUIDString;
+    uid: string;
+    name?: string | null;
+    preferredLanguage?: string | null;
+    mobile?: string | null;
+  } & User_Key)[];
+}
+
+export interface GetUserByUidVariables {
+  uid: string;
+}
+
 export interface LegalAidCenter_Key {
   id: UUIDString;
   __typename?: 'LegalAidCenter_Key';
+}
+
+export interface UpsertUserProfileData {
+  user_upsert: User_Key;
+}
+
+export interface UpsertUserProfileVariables {
+  id?: UUIDString | null;
+  uid: string;
+  name?: string | null;
+  preferredLanguage?: string | null;
+  mobile?: string | null;
 }
 
 export interface UserQuery_Key {
@@ -78,17 +139,41 @@ export const createUserRef: CreateUserRef;
 export function createUser(vars: CreateUserVariables): MutationPromise<CreateUserData, CreateUserVariables>;
 export function createUser(dc: DataConnect, vars: CreateUserVariables): MutationPromise<CreateUserData, CreateUserVariables>;
 
-interface CreateAppointmentRef {
+interface GetUserByUidRef {
   /* Allow users to create refs without passing in DataConnect */
-  (vars: CreateAppointmentVariables): MutationRef<CreateAppointmentData, CreateAppointmentVariables>;
+  (vars: GetUserByUidVariables): QueryRef<GetUserByUidData, GetUserByUidVariables>;
   /* Allow users to pass in custom DataConnect instances */
-  (dc: DataConnect, vars: CreateAppointmentVariables): MutationRef<CreateAppointmentData, CreateAppointmentVariables>;
+  (dc: DataConnect, vars: GetUserByUidVariables): QueryRef<GetUserByUidData, GetUserByUidVariables>;
   operationName: string;
 }
-export const createAppointmentRef: CreateAppointmentRef;
+export const getUserByUidRef: GetUserByUidRef;
 
-export function createAppointment(vars: CreateAppointmentVariables): MutationPromise<CreateAppointmentData, CreateAppointmentVariables>;
-export function createAppointment(dc: DataConnect, vars: CreateAppointmentVariables): MutationPromise<CreateAppointmentData, CreateAppointmentVariables>;
+export function getUserByUid(vars: GetUserByUidVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserByUidData, GetUserByUidVariables>;
+export function getUserByUid(dc: DataConnect, vars: GetUserByUidVariables, options?: ExecuteQueryOptions): QueryPromise<GetUserByUidData, GetUserByUidVariables>;
+
+interface UpsertUserProfileRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: UpsertUserProfileVariables): MutationRef<UpsertUserProfileData, UpsertUserProfileVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: UpsertUserProfileVariables): MutationRef<UpsertUserProfileData, UpsertUserProfileVariables>;
+  operationName: string;
+}
+export const upsertUserProfileRef: UpsertUserProfileRef;
+
+export function upsertUserProfile(vars: UpsertUserProfileVariables): MutationPromise<UpsertUserProfileData, UpsertUserProfileVariables>;
+export function upsertUserProfile(dc: DataConnect, vars: UpsertUserProfileVariables): MutationPromise<UpsertUserProfileData, UpsertUserProfileVariables>;
+
+interface CreateLegalAidCenterRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateLegalAidCenterVariables): MutationRef<CreateLegalAidCenterData, CreateLegalAidCenterVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateLegalAidCenterVariables): MutationRef<CreateLegalAidCenterData, CreateLegalAidCenterVariables>;
+  operationName: string;
+}
+export const createLegalAidCenterRef: CreateLegalAidCenterRef;
+
+export function createLegalAidCenter(vars: CreateLegalAidCenterVariables): MutationPromise<CreateLegalAidCenterData, CreateLegalAidCenterVariables>;
+export function createLegalAidCenter(dc: DataConnect, vars: CreateLegalAidCenterVariables): MutationPromise<CreateLegalAidCenterData, CreateLegalAidCenterVariables>;
 
 interface CreateUserQueryRef {
   /* Allow users to create refs without passing in DataConnect */
@@ -101,4 +186,28 @@ export const createUserQueryRef: CreateUserQueryRef;
 
 export function createUserQuery(vars: CreateUserQueryVariables): MutationPromise<CreateUserQueryData, CreateUserQueryVariables>;
 export function createUserQuery(dc: DataConnect, vars: CreateUserQueryVariables): MutationPromise<CreateUserQueryData, CreateUserQueryVariables>;
+
+interface CreateAppointmentRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateAppointmentVariables): MutationRef<CreateAppointmentData, CreateAppointmentVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateAppointmentVariables): MutationRef<CreateAppointmentData, CreateAppointmentVariables>;
+  operationName: string;
+}
+export const createAppointmentRef: CreateAppointmentRef;
+
+export function createAppointment(vars: CreateAppointmentVariables): MutationPromise<CreateAppointmentData, CreateAppointmentVariables>;
+export function createAppointment(dc: DataConnect, vars: CreateAppointmentVariables): MutationPromise<CreateAppointmentData, CreateAppointmentVariables>;
+
+interface CreateAppointmentWithCenterRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateAppointmentWithCenterVariables): MutationRef<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateAppointmentWithCenterVariables): MutationRef<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+  operationName: string;
+}
+export const createAppointmentWithCenterRef: CreateAppointmentWithCenterRef;
+
+export function createAppointmentWithCenter(vars: CreateAppointmentWithCenterVariables): MutationPromise<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+export function createAppointmentWithCenter(dc: DataConnect, vars: CreateAppointmentWithCenterVariables): MutationPromise<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
 

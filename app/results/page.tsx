@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import {
   AlertCircle,
-  FileText,
   MapPin,
   CheckCircle,
   Shield,
@@ -12,9 +11,7 @@ import {
 } from "lucide-react";
 import { createAppointmentDataConnect } from "@/lib/dataConnect";
 import { useAuth } from "@/context/AuthContext";
-
-const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+import { useLanguage } from "@/context/LanguageContext";
 
 type Center = {
   id: string;
@@ -28,6 +25,7 @@ type Center = {
 };
 
 export default function ResultsPage() {
+  const { t } = useLanguage();
   const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +34,7 @@ export default function ResultsPage() {
   const [centers, setCenters] = useState<Center[]>([]);
   const [loadingCenters, setLoadingCenters] = useState(true);
   const [urgency, setUrgency] = useState<string>("normal");
-  const [category, setCategory] = useState<string>("Loading...");
+  const [category, setCategory] = useState<string>(t("common.loading", "Loading..."));
   const { user } = useAuth();
 
   useEffect(() => {
@@ -84,13 +82,13 @@ export default function ResultsPage() {
 
     // Validation
     if (!name || !phone || !date || !description) {
-      setError("Please fill in all required fields");
+      setError(t("results.formRequired", "Please fill in all required fields"));
       setIsSubmitting(false);
       return;
     }
 
     if (phone.length < 10 || phone.length > 13) {
-      setError("Please enter a valid phone number");
+      setError(t("results.formPhone", "Please enter a valid phone number"));
       setIsSubmitting(false);
       return;
     }
@@ -112,11 +110,11 @@ export default function ResultsPage() {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 5000);
       } else {
-        setError("Failed to book appointment. Please try again.");
+        setError(t("results.formSubmitError", "Failed to book appointment. Please try again."));
       }
     } catch (err) {
       console.error("Error booking appointment", err);
-      setError("An unexpected error occurred. Please try again.");
+      setError(t("results.formUnexpected", "An unexpected error occurred. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
@@ -128,7 +126,7 @@ export default function ResultsPage() {
         <div className="w-full bg-red-600 text-white font-semibold py-3 px-4 flex justify-center items-center gap-2">
           <AlertCircle className="w-5 h-5 animate-pulse" />
           <span>
-            Need immediate help? Call Women Helpline: 181, Police: 100
+            {t("results.urgent", "Need immediate help? Call Women Helpline: 181, Police: 100")}
           </span>
         </div>
       )}
@@ -138,14 +136,13 @@ export default function ResultsPage() {
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 text-[var(--color-deep-blue)] font-bold text-sm shadow-sm capitalize">
             <span className="w-2 h-2 rounded-full bg-[var(--color-deep-blue)]" />
-            Category Detected: {category}
+            {t("results.category", "Category Detected")}: {category}
           </div>
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
-            Your Legal Guidance
+            {t("results.title", "Your Legal Guidance")}
           </h1>
           <p className="text-gray-500 max-w-lg mx-auto">
-            Based on your description, here are your rights under Indian Law and
-            the next steps to take.
+            {t("results.subtitle", "Based on your description, here are your rights under Indian Law and the next steps to take.")}
           </p>
         </div>
 
@@ -154,23 +151,23 @@ export default function ResultsPage() {
           <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
             <Shield className="w-6 h-6 text-[var(--color-saffron)]" />
             <h2 className="text-2xl font-bold text-gray-800">
-              Know Your Rights
+              {t("results.rights", "Know Your Rights")}
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {[
               {
-                title: "Right to Wages",
-                desc: "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act.",
+                title: t("results.right1.title", "Right to Wages"),
+                desc: t("results.right1.desc", "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act."),
               },
               {
-                title: "Protection from Unfair Dismissal",
-                desc: "An employer must provide proper notice before termination under the Industrial Disputes Act.",
+                title: t("results.right2.title", "Protection from Unfair Dismissal"),
+                desc: t("results.right2.desc", "An employer must provide proper notice before termination under the Industrial Disputes Act."),
               },
               {
-                title: "Right to Free Legal Aid",
-                desc: "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation.",
+                title: t("results.right3.title", "Right to Free Legal Aid"),
+                desc: t("results.right3.desc", "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation."),
               },
             ].map((right, i) => (
               <div
@@ -198,36 +195,34 @@ export default function ResultsPage() {
           <div>
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
               <CheckCircle className="w-6 h-6 text-[var(--color-deep-blue)]" />
-              <h2 className="text-2xl font-bold text-gray-800">Next Steps</h2>
+              <h2 className="text-2xl font-bold text-gray-800">{t("results.nextSteps", "Next Steps")}</h2>
             </div>
             <ol className="space-y-6 relative border-l-2 border-blue-100 ml-3">
               <li className="pl-6 relative">
                 <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
                   1
                 </span>
-                <h4 className="font-bold text-gray-800">Gather Evidence</h4>
+                <h4 className="font-bold text-gray-800">{t("results.gatherEvidence", "Gather Evidence")}</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Collect all employment contracts, ID cards, and WhatsApp
-                  messages with your employer.
+                  {t("results.gatherEvidenceDesc", "Collect all employment contracts, ID cards, and WhatsApp messages with your employer.")}
                 </p>
               </li>
               <li className="pl-6 relative">
                 <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
                   2
                 </span>
-                <h4 className="font-bold text-gray-800">Draft a Complaint</h4>
+                <h4 className="font-bold text-gray-800">{t("results.draftComplaint", "Draft a Complaint")}</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Write a simple timeline of events in your preferred language.
+                  {t("results.draftComplaintDesc", "Write a simple timeline of events in your preferred language.")}
                 </p>
               </li>
               <li className="pl-6 relative">
                 <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50">
                   3
                 </span>
-                <h4 className="font-bold text-gray-800">Visit a Free Center</h4>
+                <h4 className="font-bold text-gray-800">{t("results.visitCenter", "Visit a Free Center")}</h4>
                 <p className="text-sm text-gray-600 mt-1">
-                  Book an appointment or walk into a Legal Aid center listed
-                  below.
+                  {t("results.visitCenterDesc", "Book an appointment or walk into a Legal Aid center listed below.")}
                 </p>
               </li>
             </ol>
@@ -237,7 +232,7 @@ export default function ResultsPage() {
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200">
               <MapPin className="w-6 h-6 text-green-600" />
               <h2 className="text-2xl font-bold text-gray-800">
-                Nearby Legal Centers
+                {t("results.centers", "Nearby Legal Centers")}
               </h2>
             </div>
 
@@ -257,12 +252,12 @@ export default function ResultsPage() {
             <div className="space-y-3">
               {loadingCenters && (
                 <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-gray-500 shadow-sm">
-                  Loading legal centers from the database...
+                  {t("results.loadingCenters", "Loading legal centers from the database...")}
                 </div>
               )}
               {!loadingCenters && centers.length === 0 && (
                 <div className="bg-white p-4 rounded-xl border border-gray-100 text-sm text-gray-500 shadow-sm">
-                  No legal centers found in the database.
+                  {t("results.noCenters", "No legal centers found in the database.")}
                 </div>
               )}
               {centers.map((center) => (
@@ -287,7 +282,7 @@ export default function ResultsPage() {
                     }}
                     className="flex-shrink-0 bg-blue-50 text-[var(--color-deep-blue)] hover:bg-[var(--color-deep-blue)] hover:text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors"
                   >
-                    Book
+                    {t("results.book", "Book")}
                   </button>
                 </div>
               ))}
@@ -313,7 +308,7 @@ export default function ResultsPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[slideUpFadeIn_0.3s_ease-out]">
             <div className="bg-[var(--color-deep-blue)] p-4 flex justify-between items-center text-white">
-              <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="w-5 h-5"/> Book Consultation</h3>
+              <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="w-5 h-5"/> {t("results.bookConsultation", "Book Consultation")}</h3>
               <button onClick={() => { setIsBooking(false); setError(null); }} className="text-blue-200 hover:text-white transition-colors">
                 <X className="w-6 h-6" />
               </button>
@@ -328,38 +323,38 @@ export default function ResultsPage() {
               )}
 
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Center</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t("results.center", "Center")}</p>
                 <p className="font-semibold text-gray-900 dark:text-white">{selectedCenter.name}</p>
                 <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{selectedCenter.phone}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Your Name <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.yourName", "Your Name")} <span className="text-red-500">*</span></label>
                 <input 
                   required 
                   name="name" 
                   defaultValue={user?.displayName || ""} 
                   type="text" 
                   className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
-                  placeholder="Ramesh Kumar" 
+                  placeholder={t("results.namePlaceholder", "Ramesh Kumar")} 
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.phoneNumber", "Phone Number")} <span className="text-red-500">*</span></label>
                 <input 
                   required 
                   name="phone" 
                   type="tel" 
                   pattern="[0-9]{10,13}"
                   className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
-                  placeholder="9876543210" 
+                  placeholder={t("results.phonePlaceholder", "9876543210")} 
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preferred Date <span className="text-red-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.preferredDate", "Preferred Date")} <span className="text-red-500">*</span></label>
                   <input 
                     required 
                     name="date" 
@@ -369,7 +364,7 @@ export default function ResultsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.timeOptional", "Time (Optional)")}</label>
                   <input 
                     name="time" 
                     type="time" 
@@ -379,16 +374,16 @@ export default function ResultsPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Brief Description <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.briefDescription", "Brief Description")} <span className="text-red-500">*</span></label>
                 <textarea 
                   required 
                   name="description" 
                   rows={3} 
                   maxLength={500}
                   className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" 
-                  placeholder="Explain your legal issue briefly (e.g., unpaid wages, harassment, contract dispute)..."
+                  placeholder={t("results.descriptionPlaceholder", "Explain your legal issue briefly (e.g., unpaid wages, harassment, contract dispute)...")}
                 ></textarea>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This helps the legal advisor prepare for your consultation</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("results.descriptionHelp", "This helps the legal advisor prepare for your consultation")}</p>
               </div>
 
               <div className="pt-2 space-y-3">
@@ -397,10 +392,10 @@ export default function ResultsPage() {
                   disabled={isSubmitting}
                   className="w-full bg-[var(--color-saffron)] hover:bg-orange-600 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg shadow-md transition-colors"
                 >
-                  {isSubmitting ? "Booking..." : "Confirm Booking"}
+                  {isSubmitting ? t("results.booking", "Booking...") : t("results.confirmBooking", "Confirm Booking")}
                 </button>
                 <p className="text-center text-xs text-gray-500 dark:text-gray-400 font-medium flex justify-center items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5"/> All information is kept completely confidential.
+                  <Shield className="w-3.5 h-3.5"/> {t("results.confidential", "All information is kept completely confidential.")}
                 </p>
               </div>
             </form>
@@ -412,7 +407,7 @@ export default function ResultsPage() {
       {success && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-900 text-white px-6 py-3 rounded-full font-bold shadow-xl flex items-center gap-3 animate-[slideUpFadeIn_0.3s_ease-out] z-50">
           <CheckCircle className="w-5 h-5 text-green-400" />
-          <span>Your appointment request has been sent!</span>
+          <span>{t("results.requestSent", "Your appointment request has been sent!")}</span>
         </div>
       )}
     </div>
