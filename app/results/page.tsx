@@ -565,7 +565,7 @@ export default function ResultsPage() {
         )}
 
         {safetyStatus === "unsafe" && primaryEmergencyContact && (
-          <section className="w-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/70 rounded-2xl p-5 shadow-sm">
+          <section className="print:hidden w-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/70 rounded-2xl p-5 shadow-sm">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">
               {t("results.emergencyNow", "Emergency Support")}
             </p>
