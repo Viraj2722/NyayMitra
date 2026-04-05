@@ -37,8 +37,8 @@ Our architecture decouples the AI intelligence from the User Interface for maxim
 
 ## Documentation references
 
-- 🔑 **[API Keys Setup Guide](./API_KEYS_GUIDE.md)**: Steps to configure Gemini, Firebase Auth/Data Connect, and Google Maps.
-- 🗄️ **[Database Schema Design](./DB_SCHEMA.md)**: Read how our Firebase Data Connect GraphQL schema ensures privacy and robust relational connections.
+- 🔑 **[API Keys Setup Guide](./docs/API_KEYS_GUIDE.md)**: Steps to configure Gemini, Firebase Auth/Data Connect, and Google Maps.
+- 🗄️ **[Database Schema Design](./docs/DB_SCHEMA.md)**: Read how our Firebase Data Connect GraphQL schema ensures privacy and robust relational connections.
 - 📚 **[RAG Implementation Guide](./docs/RAG_IMPLEMENTATION.md)**: Local chunking retrieval, citation flow, verification fields, and troubleshooting.
 
 ---
