@@ -12,14 +12,17 @@
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@dataconnect/my-app": "file:lib/dataconnect-generated",
     "@react-google-maps/api": "^2.20.8",
+    "@types/leaflet": "^1.9.21",
     "firebase": "^12.11.0",
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.7.0",
     "next": "16.2.2",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

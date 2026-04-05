@@ -11,6 +11,8 @@ This README will guide you through the process of using the generated JavaScript
   - [*Connecting to the local Emulator*](#connecting-to-the-local-emulator)
 - [**Queries**](#queries)
   - [*GetUserByUid*](#getuserbyuid)
+  - [*ListAppointmentsByUserId*](#listappointmentsbyuserid)
+  - [*ListLegalAidCenters*](#listlegalaidcenters)
   - [*SearchLegalChunks*](#searchlegalchunks)
   - [*SearchLegalChunksByLaw*](#searchlegalchunksbylaw)
   - [*ListLegalChunksByLaw*](#listlegalchunksbylaw)
@@ -21,6 +23,7 @@ This README will guide you through the process of using the generated JavaScript
   - [*CreateUserQuery*](#createuserquery)
   - [*CreateAppointment*](#createappointment)
   - [*CreateAppointmentWithCenter*](#createappointmentwithcenter)
+  - [*DeleteAppointmentById*](#deleteappointmentbyid)
   - [*CreateLegalChunk*](#createlegalchunk)
 
 # Accessing the connector
@@ -180,6 +183,254 @@ console.log(data.users);
 executeQuery(ref).then((response) => {
   const data = response.data;
   console.log(data.users);
+});
+```
+
+## ListAppointmentsByUserId
+You can execute the `ListAppointmentsByUserId` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+listAppointmentsByUserId(vars: ListAppointmentsByUserIdVariables, options?: ExecuteQueryOptions): QueryPromise<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+
+interface ListAppointmentsByUserIdRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ListAppointmentsByUserIdVariables): QueryRef<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+}
+export const listAppointmentsByUserIdRef: ListAppointmentsByUserIdRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listAppointmentsByUserId(dc: DataConnect, vars: ListAppointmentsByUserIdVariables, options?: ExecuteQueryOptions): QueryPromise<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+
+interface ListAppointmentsByUserIdRef {
+  ...
+  (dc: DataConnect, vars: ListAppointmentsByUserIdVariables): QueryRef<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+}
+export const listAppointmentsByUserIdRef: ListAppointmentsByUserIdRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listAppointmentsByUserIdRef:
+```typescript
+const name = listAppointmentsByUserIdRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListAppointmentsByUserId` query requires an argument of type `ListAppointmentsByUserIdVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface ListAppointmentsByUserIdVariables {
+  userId: UUIDString;
+  limit: number;
+}
+```
+### Return Type
+Recall that executing the `ListAppointmentsByUserId` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListAppointmentsByUserIdData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListAppointmentsByUserIdData {
+  appointments: ({
+    id: UUIDString;
+    userName: string;
+    userContact: string;
+    problemSummary: string;
+    preferredDate: DateString;
+    preferredTime?: string | null;
+    status: string;
+    createdAt: TimestampString;
+    legalAidCenter: {
+      id: UUIDString;
+      name: string;
+      address: string;
+      phone: string;
+    } & LegalAidCenter_Key;
+  } & Appointment_Key)[];
+}
+```
+### Using `ListAppointmentsByUserId`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listAppointmentsByUserId, ListAppointmentsByUserIdVariables } from '@dataconnect/my-app';
+
+// The `ListAppointmentsByUserId` query requires an argument of type `ListAppointmentsByUserIdVariables`:
+const listAppointmentsByUserIdVars: ListAppointmentsByUserIdVariables = {
+  userId: ..., 
+  limit: ..., 
+};
+
+// Call the `listAppointmentsByUserId()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listAppointmentsByUserId(listAppointmentsByUserIdVars);
+// Variables can be defined inline as well.
+const { data } = await listAppointmentsByUserId({ userId: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listAppointmentsByUserId(dataConnect, listAppointmentsByUserIdVars);
+
+console.log(data.appointments);
+
+// Or, you can use the `Promise` API.
+listAppointmentsByUserId(listAppointmentsByUserIdVars).then((response) => {
+  const data = response.data;
+  console.log(data.appointments);
+});
+```
+
+### Using `ListAppointmentsByUserId`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listAppointmentsByUserIdRef, ListAppointmentsByUserIdVariables } from '@dataconnect/my-app';
+
+// The `ListAppointmentsByUserId` query requires an argument of type `ListAppointmentsByUserIdVariables`:
+const listAppointmentsByUserIdVars: ListAppointmentsByUserIdVariables = {
+  userId: ..., 
+  limit: ..., 
+};
+
+// Call the `listAppointmentsByUserIdRef()` function to get a reference to the query.
+const ref = listAppointmentsByUserIdRef(listAppointmentsByUserIdVars);
+// Variables can be defined inline as well.
+const ref = listAppointmentsByUserIdRef({ userId: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listAppointmentsByUserIdRef(dataConnect, listAppointmentsByUserIdVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.appointments);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.appointments);
+});
+```
+
+## ListLegalAidCenters
+You can execute the `ListLegalAidCenters` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+listLegalAidCenters(vars: ListLegalAidCentersVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+
+interface ListLegalAidCentersRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ListLegalAidCentersVariables): QueryRef<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+}
+export const listLegalAidCentersRef: ListLegalAidCentersRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listLegalAidCenters(dc: DataConnect, vars: ListLegalAidCentersVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+
+interface ListLegalAidCentersRef {
+  ...
+  (dc: DataConnect, vars: ListLegalAidCentersVariables): QueryRef<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+}
+export const listLegalAidCentersRef: ListLegalAidCentersRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listLegalAidCentersRef:
+```typescript
+const name = listLegalAidCentersRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListLegalAidCenters` query requires an argument of type `ListLegalAidCentersVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface ListLegalAidCentersVariables {
+  limit: number;
+}
+```
+### Return Type
+Recall that executing the `ListLegalAidCenters` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListLegalAidCentersData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListLegalAidCentersData {
+  legalAidCenters: ({
+    id: UUIDString;
+    name: string;
+    address: string;
+    phone: string;
+    latitude: number;
+    longitude: number;
+    freeServices: boolean;
+    categories: string[];
+    timings?: string | null;
+    description?: string | null;
+    createdAt: TimestampString;
+  } & LegalAidCenter_Key)[];
+}
+```
+### Using `ListLegalAidCenters`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listLegalAidCenters, ListLegalAidCentersVariables } from '@dataconnect/my-app';
+
+// The `ListLegalAidCenters` query requires an argument of type `ListLegalAidCentersVariables`:
+const listLegalAidCentersVars: ListLegalAidCentersVariables = {
+  limit: ..., 
+};
+
+// Call the `listLegalAidCenters()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listLegalAidCenters(listLegalAidCentersVars);
+// Variables can be defined inline as well.
+const { data } = await listLegalAidCenters({ limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listLegalAidCenters(dataConnect, listLegalAidCentersVars);
+
+console.log(data.legalAidCenters);
+
+// Or, you can use the `Promise` API.
+listLegalAidCenters(listLegalAidCentersVars).then((response) => {
+  const data = response.data;
+  console.log(data.legalAidCenters);
+});
+```
+
+### Using `ListLegalAidCenters`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listLegalAidCentersRef, ListLegalAidCentersVariables } from '@dataconnect/my-app';
+
+// The `ListLegalAidCenters` query requires an argument of type `ListLegalAidCentersVariables`:
+const listLegalAidCentersVars: ListLegalAidCentersVariables = {
+  limit: ..., 
+};
+
+// Call the `listLegalAidCentersRef()` function to get a reference to the query.
+const ref = listLegalAidCentersRef(listLegalAidCentersVars);
+// Variables can be defined inline as well.
+const ref = listLegalAidCentersRef({ limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listLegalAidCentersRef(dataConnect, listLegalAidCentersVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.legalAidCenters);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.legalAidCenters);
 });
 ```
 
@@ -1335,6 +1586,115 @@ console.log(data.appointment_insert);
 executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.appointment_insert);
+});
+```
+
+## DeleteAppointmentById
+You can execute the `DeleteAppointmentById` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+deleteAppointmentById(vars: DeleteAppointmentByIdVariables): MutationPromise<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+
+interface DeleteAppointmentByIdRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteAppointmentByIdVariables): MutationRef<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+}
+export const deleteAppointmentByIdRef: DeleteAppointmentByIdRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+deleteAppointmentById(dc: DataConnect, vars: DeleteAppointmentByIdVariables): MutationPromise<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+
+interface DeleteAppointmentByIdRef {
+  ...
+  (dc: DataConnect, vars: DeleteAppointmentByIdVariables): MutationRef<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+}
+export const deleteAppointmentByIdRef: DeleteAppointmentByIdRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the deleteAppointmentByIdRef:
+```typescript
+const name = deleteAppointmentByIdRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `DeleteAppointmentById` mutation requires an argument of type `DeleteAppointmentByIdVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface DeleteAppointmentByIdVariables {
+  id: UUIDString;
+}
+```
+### Return Type
+Recall that executing the `DeleteAppointmentById` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `DeleteAppointmentByIdData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface DeleteAppointmentByIdData {
+  appointment_delete?: Appointment_Key | null;
+}
+```
+### Using `DeleteAppointmentById`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, deleteAppointmentById, DeleteAppointmentByIdVariables } from '@dataconnect/my-app';
+
+// The `DeleteAppointmentById` mutation requires an argument of type `DeleteAppointmentByIdVariables`:
+const deleteAppointmentByIdVars: DeleteAppointmentByIdVariables = {
+  id: ..., 
+};
+
+// Call the `deleteAppointmentById()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await deleteAppointmentById(deleteAppointmentByIdVars);
+// Variables can be defined inline as well.
+const { data } = await deleteAppointmentById({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await deleteAppointmentById(dataConnect, deleteAppointmentByIdVars);
+
+console.log(data.appointment_delete);
+
+// Or, you can use the `Promise` API.
+deleteAppointmentById(deleteAppointmentByIdVars).then((response) => {
+  const data = response.data;
+  console.log(data.appointment_delete);
+});
+```
+
+### Using `DeleteAppointmentById`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, deleteAppointmentByIdRef, DeleteAppointmentByIdVariables } from '@dataconnect/my-app';
+
+// The `DeleteAppointmentById` mutation requires an argument of type `DeleteAppointmentByIdVariables`:
+const deleteAppointmentByIdVars: DeleteAppointmentByIdVariables = {
+  id: ..., 
+};
+
+// Call the `deleteAppointmentByIdRef()` function to get a reference to the mutation.
+const ref = deleteAppointmentByIdRef(deleteAppointmentByIdVars);
+// Variables can be defined inline as well.
+const ref = deleteAppointmentByIdRef({ id: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = deleteAppointmentByIdRef(dataConnect, deleteAppointmentByIdVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.appointment_delete);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.appointment_delete);
 });
 ```
 

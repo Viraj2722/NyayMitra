@@ -43,6 +43,10 @@ def _sort_appointments_desc(appointments):
     return sorted(appointments, key=sort_key, reverse=True)
 
 
+def _is_cancelled(item):
+    return str(item.get("status") or "").strip().lower() == "cancelled"
+
+
 def _appointments_collection():
     db = firestore.client()
     return db.collection("appointments")
@@ -88,7 +92,7 @@ def recent_appointments():
     try:
         limit = int(request.args.get("limit", 20))
         docs = _appointments_collection().stream()
-        appointments = [_serialize_appointment(doc) for doc in docs]
+        appointments = [item for item in (_serialize_appointment(doc) for doc in docs) if not _is_cancelled(item)]
         return jsonify(_sort_appointments_desc(appointments)[:limit])
     except Exception as e:
         print("Recent appointment load failed, returning empty list:", e)
@@ -103,7 +107,7 @@ def my_appointments():
             return jsonify([]), 200
 
         docs = _appointments_collection().where("user_id", "==", user_id).stream()
-        appointments = [_serialize_appointment(doc) for doc in docs]
+        appointments = [item for item in (_serialize_appointment(doc) for doc in docs) if not _is_cancelled(item)]
         return jsonify(_sort_appointments_desc(appointments))
     except Exception as e:
         print("User appointment load failed, returning empty list:", e)
@@ -153,11 +157,7 @@ def cancel_appointment(appointment_id):
         if not doc:
             return jsonify({"error": "Appointment not found"}), 404
 
-        _appointments_collection().document(appointment_id).update({
-            "status": "cancelled",
-            "updated_at": datetime.datetime.utcnow(),
-        })
-        updated_doc = _appointments_collection().document(appointment_id).get()
-        return jsonify(_serialize_appointment(updated_doc)), 200
+        _appointments_collection().document(appointment_id).delete()
+        return jsonify({"message": "Appointment removed", "id": appointment_id}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

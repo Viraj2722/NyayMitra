@@ -12,7 +12,7 @@ For each operation, there is a wrapper hook that can be used to call the operati
 
 Here are all of the hooks that get generated:
 ```ts
-import { useCreateUser, useGetUserByUid, useUpsertUserProfile, useCreateLegalAidCenter, useCreateUserQuery, useCreateAppointment, useCreateAppointmentWithCenter, useCreateLegalChunk, useSearchLegalChunks, useSearchLegalChunksByLaw } from '@dataconnect/my-app/react';
+import { useCreateUser, useGetUserByUid, useUpsertUserProfile, useCreateLegalAidCenter, useCreateUserQuery, useCreateAppointment, useCreateAppointmentWithCenter, useListAppointmentsByUserId, useListLegalAidCenters, useDeleteAppointmentById } from '@dataconnect/my-app/react';
 // The types of these hooks are available in react/index.d.ts
 
 const { data, isPending, isSuccess, isError, error } = useCreateUser(createUserVars);
@@ -29,11 +29,11 @@ const { data, isPending, isSuccess, isError, error } = useCreateAppointment(crea
 
 const { data, isPending, isSuccess, isError, error } = useCreateAppointmentWithCenter(createAppointmentWithCenterVars);
 
-const { data, isPending, isSuccess, isError, error } = useCreateLegalChunk(createLegalChunkVars);
+const { data, isPending, isSuccess, isError, error } = useListAppointmentsByUserId(listAppointmentsByUserIdVars);
 
-const { data, isPending, isSuccess, isError, error } = useSearchLegalChunks(searchLegalChunksVars);
+const { data, isPending, isSuccess, isError, error } = useListLegalAidCenters(listLegalAidCentersVars);
 
-const { data, isPending, isSuccess, isError, error } = useSearchLegalChunksByLaw(searchLegalChunksByLawVars);
+const { data, isPending, isSuccess, isError, error } = useDeleteAppointmentById(deleteAppointmentByIdVars);
 
 ```
 
@@ -72,7 +72,7 @@ If a user is not using a supported framework, they can use the generated SDK dir
 Here's an example of how to use it with the first 5 operations:
 
 ```js
-import { createUser, getUserByUid, upsertUserProfile, createLegalAidCenter, createUserQuery, createAppointment, createAppointmentWithCenter, createLegalChunk, searchLegalChunks, searchLegalChunksByLaw } from '@dataconnect/my-app';
+import { createUser, getUserByUid, upsertUserProfile, createLegalAidCenter, createUserQuery, createAppointment, createAppointmentWithCenter, listAppointmentsByUserId, listLegalAidCenters, deleteAppointmentById } from '@dataconnect/my-app';
 
 
 // Operation CreateUser:  For variables, look at type CreateUserVars in ../index.d.ts
@@ -96,14 +96,14 @@ const { data } = await CreateAppointment(dataConnect, createAppointmentVars);
 // Operation CreateAppointmentWithCenter:  For variables, look at type CreateAppointmentWithCenterVars in ../index.d.ts
 const { data } = await CreateAppointmentWithCenter(dataConnect, createAppointmentWithCenterVars);
 
-// Operation CreateLegalChunk:  For variables, look at type CreateLegalChunkVars in ../index.d.ts
-const { data } = await CreateLegalChunk(dataConnect, createLegalChunkVars);
+// Operation ListAppointmentsByUserId:  For variables, look at type ListAppointmentsByUserIdVars in ../index.d.ts
+const { data } = await ListAppointmentsByUserId(dataConnect, listAppointmentsByUserIdVars);
 
-// Operation SearchLegalChunks:  For variables, look at type SearchLegalChunksVars in ../index.d.ts
-const { data } = await SearchLegalChunks(dataConnect, searchLegalChunksVars);
+// Operation ListLegalAidCenters:  For variables, look at type ListLegalAidCentersVars in ../index.d.ts
+const { data } = await ListLegalAidCenters(dataConnect, listLegalAidCentersVars);
 
-// Operation SearchLegalChunksByLaw:  For variables, look at type SearchLegalChunksByLawVars in ../index.d.ts
-const { data } = await SearchLegalChunksByLaw(dataConnect, searchLegalChunksByLawVars);
+// Operation DeleteAppointmentById:  For variables, look at type DeleteAppointmentByIdVars in ../index.d.ts
+const { data } = await DeleteAppointmentById(dataConnect, deleteAppointmentByIdVars);
 
 
 ```

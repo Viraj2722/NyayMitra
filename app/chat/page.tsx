@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Send, Mic, Info, Scale, MapPin } from "lucide-react";
+import { Send, Mic, Info, Scale, MapPin, Volume2, VolumeX, Trash2, CircleStop } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createUserQuery } from "@dataconnect/my-app";
 import { dataConnect } from "@/lib/firebase";
@@ -129,6 +129,7 @@ const RESULTS_BUTTON_LABELS: Record<AppLanguage, string> = {
 };
 
 const CHAT_SESSION_KEY = "nyaymitra_chat_session";
+const TTS_ENABLED_KEY = "nyaymitra_tts_enabled";
 
 const getBackendBaseCandidates = (): string[] => {
   const candidates: string[] = [];
@@ -193,9 +194,93 @@ export default function ChatPage() {
   >("idle");
   const [locationAsked, setLocationAsked] = useState(false);
   const [hasInitializedSession, setHasInitializedSession] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const activeUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const router = useRouter();
+
+  const pickSpeechVoice = (langTag: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return null;
+    }
+
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) {
+      return null;
+    }
+
+    const normalized = langTag.toLowerCase();
+    const base = normalized.split("-")[0];
+
+    return (
+      voices.find((voice) => voice.lang.toLowerCase() === normalized) ||
+      voices.find((voice) => voice.lang.toLowerCase().startsWith(`${base}-`)) ||
+      voices.find((voice) => voice.lang.toLowerCase().startsWith(base)) ||
+      null
+    );
+  };
+
+  const speakAssistantText = (text: string) => {
+    if (
+      typeof window === "undefined" ||
+      !ttsEnabled ||
+      !("speechSynthesis" in window)
+    ) {
+      return;
+    }
+
+    const cleaned = String(text || "").trim();
+    if (!cleaned) {
+      return;
+    }
+
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(cleaned);
+    activeUtteranceRef.current = utterance;
+    utterance.lang = speechLang;
+    utterance.rate = 0.96;
+    utterance.pitch = 1;
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      activeUtteranceRef.current = null;
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      activeUtteranceRef.current = null;
+    };
+
+    const voice = pickSpeechVoice(speechLang);
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    synth.cancel();
+    synth.speak(utterance);
+  };
+
+  const stopAssistantVoice = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    activeUtteranceRef.current = null;
+    setIsSpeaking(false);
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem(TTS_ENABLED_KEY);
+    if (stored === "false") {
+      setTtsEnabled(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(TTS_ENABLED_KEY, ttsEnabled ? "true" : "false");
+  }, [ttsEnabled]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -446,6 +531,7 @@ export default function ChatPage() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+      speakAssistantText(aiMessage.text);
 
       localStorage.setItem(
         "nyaymitra_category",
@@ -527,6 +613,7 @@ export default function ChatPage() {
         sender: "ai",
       };
       setMessages((prev) => [...prev, errorMessage]);
+      speakAssistantText(errorMessage.text);
     } finally {
       setIsLoading(false);
     }
@@ -582,6 +669,44 @@ export default function ChatPage() {
     router.push("/results");
   };
 
+  const handleClearChat = () => {
+    const confirmed = window.confirm(
+      t("chat.clearConfirm", "Clear this chat and reset intake selections?"),
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    stopAssistantVoice();
+
+    setMessages([
+      {
+        id: "1",
+        text: getLanguageGreeting(selectedLanguage),
+        sender: "ai",
+      },
+    ]);
+    setSelectedCategory(null);
+    setFollowUpAnswer(null);
+    setInput("");
+    setIsLoading(false);
+
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem(CHAT_SESSION_KEY);
+      [
+        "nyaymitra_category",
+        "nyaymitra_centers",
+        "nyaymitra_urgent",
+        "nyaymitra_detected_lang",
+        "nyaymitra_rights",
+        "nyaymitra_next_steps",
+        "nyaymitra_emergency_numbers",
+        "nyaymitra_map_search_query",
+        "nyaymitra_citations",
+      ].forEach((key) => localStorage.removeItem(key));
+    }
+  };
+
   const showResultsButton =
     messages.length > 1 &&
     messages[messages.length - 1]?.sender === "ai" &&
@@ -598,7 +723,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex-1 flex flex-col w-full h-full bg-[#E5DDD5] dark:bg-[#0b141a] relative overflow-hidden">
+    <div className="flex flex-col w-full h-[calc(100dvh-4.25rem)] max-h-[calc(100dvh-4.25rem)] min-h-0 bg-[#17324a] dark:bg-[#0b2238] relative overflow-hidden">
       {showMobilePopup && (
         <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl p-6 space-y-4">
@@ -627,24 +752,23 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div className="bg-[var(--color-deep-blue)] dark:bg-[#202c33] text-white px-4 py-3 flex items-center justify-between shadow-md z-10 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 dark:bg-white/10 rounded-full flex items-center justify-center">
-            <Scale className="w-5 h-5 text-white" />
+      <div className="bg-[var(--color-deep-blue)] dark:bg-[#202c33] text-white px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between shadow-md z-10 shrink-0">
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-white/20 dark:bg-white/10 rounded-full flex items-center justify-center shrink-0">
+            <Scale className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
           </div>
-          <div>
-            <h2 className="font-semibold text-lg leading-tight text-white">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-base sm:text-lg leading-tight text-white truncate">
               NyayMitra Assistant
             </h2>
-            <p className="text-xs text-blue-100/90 dark:text-gray-400">
+            <p className="text-xs text-blue-100/90 dark:text-gray-400 truncate">
               {`${t("chat.language", "Language")}: ${LANG_META[selectedLanguage].label}`}
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-[url('https://i.pinimg.com/originals/8f/ba/cb/8fbacbd464e996966eb9d4a6b7a9c21e.jpg')] dark:bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-cover bg-fixed bg-center relative z-0">
-        <div className="absolute inset-0 bg-[#E5DDD5]/90 dark:bg-[#0b141a]/85 -z-10 mix-blend-normal"></div>
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 space-y-4 bg-[linear-gradient(rgba(23,50,74,0.86),rgba(23,50,74,0.86)),url('https://i.pinimg.com/originals/8f/ba/cb/8fbacbd464e996966eb9d4a6b7a9c21e.jpg')] dark:bg-[linear-gradient(rgba(11,34,56,0.84),rgba(11,34,56,0.84)),url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-cover bg-center bg-no-repeat">
 
         <div className="text-center mb-2">
           <span className="bg-[#D9FDD3]/70 dark:bg-[#182229] text-xs text-gray-700 dark:text-[#8696a0] px-3 py-1.5 rounded-lg shadow-sm font-medium">
@@ -682,20 +806,41 @@ export default function ChatPage() {
                 INTAKE_FLOW[selectedCategory].followUpQuestion,
               )}
             </p>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <button
                 onClick={() => setFollowUpAnswer("yes")}
-                className="px-4 py-2 rounded-lg bg-green-100 hover:bg-green-200 text-green-900 font-semibold"
+                className="px-4 py-2 rounded-lg bg-green-100 hover:bg-green-200 text-green-900 font-semibold w-full sm:w-auto"
               >
                 {t("common.yes", "Yes")}
               </button>
               <button
                 onClick={() => setFollowUpAnswer("no")}
-                className="px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 font-semibold"
+                className="px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 font-semibold w-full sm:w-auto"
               >
                 {t("common.no", "No")}
               </button>
             </div>
+          </div>
+        )}
+
+        {selectedCategory && (
+          <div className="bg-blue-50/90 dark:bg-[#1f2f3a] rounded-2xl p-3 border border-blue-100 dark:border-zinc-700 shadow-sm text-sm text-gray-800 dark:text-[#dce3e8] break-words">
+            <p>
+              <span className="font-semibold">
+                {t("chat.selectedIssue", "Selected Issue")}: 
+              </span>
+              {t(`intake.${selectedCategory}.label`, INTAKE_FLOW[selectedCategory].buttonLabel)}
+            </p>
+            {followUpAnswer && (
+              <p className="mt-1 text-gray-700 dark:text-[#b7c3cc]">
+                <span className="font-semibold">
+                  {t("chat.followUpAnswer", "Follow-up Answer")}: 
+                </span>
+                {followUpAnswer === "yes"
+                  ? t("common.yes", "Yes")
+                  : t("common.no", "No")}
+              </p>
+            )}
           </div>
         )}
 
@@ -705,7 +850,7 @@ export default function ChatPage() {
             className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"} w-full`}
           >
             <div
-              className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2.5 text-[15px] shadow-sm relative leading-relaxed ${
+              className={`max-w-[90%] sm:max-w-[85%] md:max-w-[70%] rounded-2xl px-3 sm:px-4 py-2.5 text-sm sm:text-[15px] shadow-sm relative leading-relaxed break-words whitespace-pre-wrap ${
                 msg.sender === "user"
                   ? "bg-[#dcf8c6] dark:bg-[#005c4b] text-black dark:text-[#e9edef] rounded-tr-none"
                   : "bg-white dark:bg-[#202c33] text-gray-900 dark:text-[#e9edef] rounded-tl-none"
@@ -739,9 +884,9 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="bg-[#f0f2f5] dark:bg-[#202c33] p-3 flex items-end gap-2 z-10 shrink-0">
+      <div className="bg-[#17324a] dark:bg-[#0f2a42] p-2 sm:p-3 flex items-end gap-1.5 sm:gap-2 z-10 shrink-0">
         {canType && locationStatus !== "granted" && (
-          <div className="absolute bottom-24 left-3 right-3 md:left-6 md:right-6 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex items-center justify-between gap-3 text-sm">
+          <div className="absolute bottom-24 left-2 right-2 sm:left-3 sm:right-3 md:left-6 md:right-6 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 text-sm">
             <div className="flex items-center gap-2 text-amber-800">
               <MapPin className="w-4 h-4" />
               <span>
@@ -753,7 +898,7 @@ export default function ChatPage() {
             {locationStatus !== "loading" && (
               <button
                 onClick={requestUserLocation}
-                className="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold"
+                className="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold w-full sm:w-auto"
               >
                 Allow
               </button>
@@ -761,11 +906,54 @@ export default function ChatPage() {
           </div>
         )}
 
-        <button className="p-3 text-gray-500 dark:text-[#8696a0] hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-          <Info className="w-6 h-6" />
+        <button className="hidden sm:inline-flex p-2.5 sm:p-3 text-gray-500 dark:text-[#8696a0] hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
+          <Info className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
 
-        <div className="flex-1 bg-white dark:bg-[#2a3942] rounded-2xl flex items-center px-2 py-1 shadow-sm border border-transparent focus-within:border-[var(--color-deep-blue)] dark:focus-within:border-blue-500 transition-colors min-h-[48px]">
+        <button
+          type="button"
+          onClick={handleClearChat}
+          className="p-2.5 sm:p-3 rounded-full text-rose-600 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+          title={t("chat.clearChat", "Clear Chat")}
+          aria-label={t("chat.clearChat", "Clear Chat")}
+        >
+          <Trash2 className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setTtsEnabled((prev) => !prev)}
+          className={`p-2.5 sm:p-3 rounded-full transition-colors ${
+            ttsEnabled
+              ? "text-emerald-600 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10"
+              : "text-gray-500 dark:text-[#8696a0] hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+          title={
+            ttsEnabled
+              ? t("chat.voiceOn", "Voice replies: ON")
+              : t("chat.voiceOff", "Voice replies: OFF")
+          }
+          aria-label={
+            ttsEnabled
+              ? t("chat.voiceOn", "Voice replies: ON")
+              : t("chat.voiceOff", "Voice replies: OFF")
+          }
+        >
+          {ttsEnabled ? <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" /> : <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />}
+        </button>
+
+        <button
+          type="button"
+          onClick={stopAssistantVoice}
+          disabled={!isSpeaking}
+          className="p-2.5 sm:p-3 rounded-full text-rose-600 dark:text-rose-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors"
+          title={t("chat.stopVoice", "Stop Voice")}
+          aria-label={t("chat.stopVoice", "Stop Voice")}
+        >
+          <CircleStop className="w-5 h-5 sm:w-6 sm:h-6" />
+        </button>
+
+        <div className="flex-1 min-w-0 bg-white dark:bg-[#2a3942] rounded-2xl flex items-center px-1.5 sm:px-2 py-1 shadow-sm border border-transparent focus-within:border-[var(--color-deep-blue)] dark:focus-within:border-blue-500 transition-colors min-h-[46px] sm:min-h-[48px]">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -779,13 +967,13 @@ export default function ChatPage() {
                     "Complete language + intake questions first",
                   )
             }
-            className="flex-1 max-h-32 min-h-[24px] bg-transparent resize-none outline-none py-2 px-3 text-[15px] text-gray-800 dark:text-[#e9edef] placeholder-gray-400 dark:placeholder-[#8696a0] disabled:opacity-60"
+            className="flex-1 max-h-32 min-h-[24px] bg-transparent resize-none outline-none py-2 px-2.5 sm:px-3 text-sm sm:text-[15px] text-gray-800 dark:text-[#e9edef] placeholder-gray-400 dark:placeholder-[#8696a0] disabled:opacity-60"
             rows={1}
           />
           <button
             onClick={isRecording ? () => {} : startRecording}
             disabled={!canType}
-            className={`p-2.5 rounded-full transition-all flex-shrink-0 ${
+            className={`p-2 rounded-full transition-all flex-shrink-0 ${
               isRecording
                 ? "bg-red-500 text-white shadow-[0_0_0_4px_rgba(239,68,68,0.2)] dark:shadow-[0_0_0_4px_rgba(239,68,68,0.4)] animate-pulse"
                 : "text-gray-500 dark:text-[#8696a0] hover:bg-gray-100 dark:hover:bg-[#202c33]"
@@ -798,13 +986,13 @@ export default function ChatPage() {
         <button
           onClick={handleSend}
           disabled={!input.trim() || !canType}
-          className={`p-3.5 rounded-full flex items-center justify-center transition-all ${
+          className={`p-2.5 sm:p-3.5 rounded-full flex items-center justify-center transition-all ${
             input.trim() && canType
               ? "bg-[#00a884] shadow-md text-white hover:scale-105 active:scale-95"
               : "bg-gray-300 dark:bg-[#2a3942] text-gray-500 dark:text-[#8696a0]"
           }`}
         >
-          <Send className="w-5 h-5 ml-0.5" />
+          <Send className="w-4 h-4 sm:w-5 sm:h-5 ml-0.5" />
         </button>
       </div>
     </div>

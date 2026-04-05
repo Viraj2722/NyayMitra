@@ -1,4 +1,4 @@
-import { CreateUserData, CreateUserVariables, GetUserByUidData, GetUserByUidVariables, UpsertUserProfileData, UpsertUserProfileVariables, CreateLegalAidCenterData, CreateLegalAidCenterVariables, CreateUserQueryData, CreateUserQueryVariables, CreateAppointmentData, CreateAppointmentVariables, CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables, CreateLegalChunkData, CreateLegalChunkVariables, SearchLegalChunksData, SearchLegalChunksVariables, SearchLegalChunksByLawData, SearchLegalChunksByLawVariables, ListLegalChunksByLawData, ListLegalChunksByLawVariables } from '../';
+import { CreateUserData, CreateUserVariables, GetUserByUidData, GetUserByUidVariables, UpsertUserProfileData, UpsertUserProfileVariables, CreateLegalAidCenterData, CreateLegalAidCenterVariables, CreateUserQueryData, CreateUserQueryVariables, CreateAppointmentData, CreateAppointmentVariables, CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables, ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables, ListLegalAidCentersData, ListLegalAidCentersVariables, DeleteAppointmentByIdData, DeleteAppointmentByIdVariables, CreateLegalChunkData, CreateLegalChunkVariables, SearchLegalChunksData, SearchLegalChunksVariables, SearchLegalChunksByLawData, SearchLegalChunksByLawVariables, ListLegalChunksByLawData, ListLegalChunksByLawVariables } from '../';
 import { UseDataConnectQueryResult, useDataConnectQueryOptions, UseDataConnectMutationResult, useDataConnectMutationOptions} from '@tanstack-query-firebase/react/data-connect';
 import { UseQueryResult, UseMutationResult} from '@tanstack/react-query';
 import { DataConnect } from 'firebase/data-connect';
@@ -25,6 +25,15 @@ export function useCreateAppointment(dc: DataConnect, options?: useDataConnectMu
 
 export function useCreateAppointmentWithCenter(options?: useDataConnectMutationOptions<CreateAppointmentWithCenterData, FirebaseError, CreateAppointmentWithCenterVariables>): UseDataConnectMutationResult<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
 export function useCreateAppointmentWithCenter(dc: DataConnect, options?: useDataConnectMutationOptions<CreateAppointmentWithCenterData, FirebaseError, CreateAppointmentWithCenterVariables>): UseDataConnectMutationResult<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+
+export function useListAppointmentsByUserId(vars: ListAppointmentsByUserIdVariables, options?: useDataConnectQueryOptions<ListAppointmentsByUserIdData>): UseDataConnectQueryResult<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+export function useListAppointmentsByUserId(dc: DataConnect, vars: ListAppointmentsByUserIdVariables, options?: useDataConnectQueryOptions<ListAppointmentsByUserIdData>): UseDataConnectQueryResult<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+
+export function useListLegalAidCenters(vars: ListLegalAidCentersVariables, options?: useDataConnectQueryOptions<ListLegalAidCentersData>): UseDataConnectQueryResult<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+export function useListLegalAidCenters(dc: DataConnect, vars: ListLegalAidCentersVariables, options?: useDataConnectQueryOptions<ListLegalAidCentersData>): UseDataConnectQueryResult<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+
+export function useDeleteAppointmentById(options?: useDataConnectMutationOptions<DeleteAppointmentByIdData, FirebaseError, DeleteAppointmentByIdVariables>): UseDataConnectMutationResult<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+export function useDeleteAppointmentById(dc: DataConnect, options?: useDataConnectMutationOptions<DeleteAppointmentByIdData, FirebaseError, DeleteAppointmentByIdVariables>): UseDataConnectMutationResult<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
 
 export function useCreateLegalChunk(options?: useDataConnectMutationOptions<CreateLegalChunkData, FirebaseError, CreateLegalChunkVariables>): UseDataConnectMutationResult<CreateLegalChunkData, CreateLegalChunkVariables>;
 export function useCreateLegalChunk(dc: DataConnect, options?: useDataConnectMutationOptions<CreateLegalChunkData, FirebaseError, CreateLegalChunkVariables>): UseDataConnectMutationResult<CreateLegalChunkData, CreateLegalChunkVariables>;

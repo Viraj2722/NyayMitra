@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle, Clock, MapPin, Phone, AlertCircle, ArrowRight, X, Navigation, Loader2 } from "lucide-react";
+import { CheckCircle, Clock, MapPin, Phone, AlertCircle, ArrowRight, X, Navigation, Loader2, Eye, Ban, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { deleteAppointmentDataConnect, getUserAppointmentsDataConnect } from "@/lib/dataConnect";
 
 interface Appointment {
   id: string;
@@ -16,11 +17,35 @@ interface Appointment {
   name: string;
   phone: string;
   issue_summary?: string;
-  status: "pending" | "confirmed" | "completed" | "cancelled";
+  status: "pending" | "confirmed" | "completed";
   created_at?: string;
 }
 
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+const normalizeStatus = (status: unknown): Appointment["status"] => {
+  const normalized = String(status || "pending").toLowerCase();
+  if (normalized === "confirmed" || normalized === "completed") {
+    return normalized;
+  }
+  return "pending";
+};
+
+const toComparableTime = (value: unknown): number => {
+  if (!value) return 0;
+
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }
+
+  if (typeof value === "object" && value !== null) {
+    const maybeTimestamp = value as { toDate?: () => Date };
+    if (typeof maybeTimestamp.toDate === "function") {
+      return maybeTimestamp.toDate().getTime();
+    }
+  }
+
+  return 0;
+};
 
 export default function AppointmentsPage() {
   const { t } = useLanguage();
@@ -29,86 +54,68 @@ export default function AppointmentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
-  const { user } = useAuth();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  const cacheKey = user?.uid ? `nyaymitra_appointments_${user.uid}` : null;
-
-  const readCachedAppointments = useCallback(() => {
-    if (!cacheKey || typeof window === "undefined") {
-      return [] as Appointment[];
-    }
-
-    try {
-      const raw = localStorage.getItem(cacheKey);
-      if (!raw) {
-        return [] as Appointment[];
-      }
-
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [] as Appointment[];
-    }
-  }, [cacheKey]);
-
-  const persistAppointments = useCallback((rows: Appointment[]) => {
-    if (!cacheKey || typeof window === "undefined") {
+  useEffect(() => {
+    if (authLoading) {
       return;
     }
 
-    try {
-      localStorage.setItem(cacheKey, JSON.stringify(rows));
-    } catch {
-      // Ignore storage failures in private mode or on constrained devices.
-    }
-  }, [cacheKey]);
-
-  useEffect(() => {
     if (!user) {
       router.push("/login");
       return;
     }
 
-    const loadAppointments = async () => {
+    if (!user?.uid) {
+      setLoading(false);
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    let active = true;
+
+    const loadFromDataConnect = async () => {
       try {
-        setError(null);
-        const controller = new AbortController();
-        const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+        const rows = await getUserAppointmentsDataConnect(user.uid, 100);
+        if (!active) return;
 
-        try {
-          const response = await fetch(`${BACKEND_BASE_URL}/api/appointments/mine?user_id=${encodeURIComponent(user.uid)}`, {
-            signal: controller.signal,
-          });
+        const normalized = rows
+          .map((item) => ({
+            ...item,
+            status: normalizeStatus(item.status),
+            _sortTs: toComparableTime(item.created_at) || toComparableTime(item.date),
+          }))
+          .sort((a, b) => b._sortTs - a._sortTs)
+          .map(({ _sortTs: _dropSortTs, ...item }) => item);
 
-          if (!response.ok) {
-            throw new Error(`Appointment load failed with status ${response.status}`);
-          }
-
-          const data = await response.json();
-          const nextAppointments = Array.isArray(data) ? data : [];
-          setAppointments(nextAppointments);
-          persistAppointments(nextAppointments);
-        } finally {
-          window.clearTimeout(timeoutId);
-        }
+        setAppointments(normalized);
+        setSelectedAppointment((previous) => {
+          if (!previous) return null;
+          return normalized.find((row) => row.id === previous.id) || null;
+        });
+        setLoading(false);
       } catch {
-        const cachedAppointments = readCachedAppointments();
-        if (cachedAppointments.length > 0) {
-          setAppointments(cachedAppointments);
-          setError(t("appointments.offlineFallback", "Live data is unavailable right now, so saved appointments are shown instead."));
-        } else {
-          setAppointments([]);
-          setError(t("appointments.loadError", "Failed to load appointments. Please try again."));
-        }
-      } finally {
+        if (!active) return;
+        setAppointments([]);
+        setError(t("appointments.loadError", "Failed to load appointments. Please try again."));
         setLoading(false);
       }
     };
 
-    loadAppointments();
-  }, [user, router, t, persistAppointments, readCachedAppointments]);
+    void loadFromDataConnect();
+    const intervalId = window.setInterval(() => {
+      void loadFromDataConnect();
+    }, 5000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [authLoading, user, router, t]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -118,8 +125,6 @@ export default function AppointmentsPage() {
         return "bg-yellow-50 border-yellow-200 text-yellow-700";
       case "completed":
         return "bg-blue-50 border-blue-200 text-blue-700";
-      case "cancelled":
-        return "bg-red-50 border-red-200 text-red-700";
       default:
         return "bg-gray-50 border-gray-200 text-gray-700";
     }
@@ -138,44 +143,56 @@ export default function AppointmentsPage() {
     }
   };
 
-  const updateAppointmentInState = (updated: Appointment) => {
-    const nextAppointments = appointments.map((item) => (item.id === updated.id ? updated : item));
-    setAppointments(nextAppointments);
-    persistAppointments(nextAppointments);
-    setSelectedAppointment(updated);
-  };
-
-  const handleCancelAppointment = async (appointment: Appointment) => {
-    if (appointment.status === "cancelled" || appointment.status === "completed") {
-      setError(t("appointments.cannotCancel", "This appointment can no longer be cancelled."));
+  const removeAppointment = async (
+    appointment: Appointment,
+    mode: "cancel" | "delete",
+  ) => {
+    if (mode === "cancel" && appointment.status === "completed") {
+      setError(t("appointments.cannotCancel", "Completed appointments cannot be cancelled."));
       return;
     }
 
-    const confirmed = window.confirm(t("appointments.cancelConfirm", "Cancel this appointment request?"));
+    const confirmMessage =
+      mode === "cancel"
+        ? t("appointments.cancelConfirm", "Cancel this appointment request? This will remove it from your records.")
+        : t("appointments.deleteConfirm", "Delete this appointment permanently from your records?");
+
+    const confirmed = window.confirm(confirmMessage);
     if (!confirmed) {
       return;
     }
 
     try {
-      setCancellingId(appointment.id);
+      setDeletingId(appointment.id);
       setError(null);
       setActionMessage(null);
 
-      const response = await fetch(`${BACKEND_BASE_URL}/api/appointments/${appointment.id}`, {
-        method: "DELETE",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to cancel appointment");
+      const deleted = await deleteAppointmentDataConnect(appointment.id);
+      if (!deleted) {
+        throw new Error("delete failed");
       }
 
-      const updated = (await response.json()) as Appointment;
-      updateAppointmentInState(updated);
-      setActionMessage(t("appointments.cancelled", "Appointment cancelled successfully."));
+      setAppointments((previous) =>
+        previous.filter((item) => item.id !== appointment.id),
+      );
+
+      if (selectedAppointment?.id === appointment.id) {
+        setSelectedAppointment(null);
+      }
+
+      setActionMessage(
+        mode === "cancel"
+          ? t("appointments.cancelled", "Appointment cancelled and removed successfully.")
+          : t("appointments.deleted", "Appointment deleted successfully."),
+      );
     } catch {
-      setError(t("appointments.cancelFailed", "Unable to cancel this appointment right now."));
+      setError(
+        mode === "cancel"
+          ? t("appointments.cancelFailed", "Unable to cancel this appointment right now.")
+          : t("appointments.deleteFailed", "Unable to delete this appointment right now."),
+      );
     } finally {
-      setCancellingId(null);
+      setDeletingId(null);
     }
   };
 
@@ -207,6 +224,10 @@ export default function AppointmentsPage() {
           <p className="text-gray-600 dark:text-gray-300 max-w-lg mx-auto">
             {t("appointments.subtitle", "Track and manage your legal consultations with free legal aid centers")}
           </p>
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            {t("appointments.liveUpdates", "Live updates enabled")}
+          </div>
         </div>
 
         {appointments.length === 0 ? (
@@ -290,40 +311,59 @@ export default function AppointmentsPage() {
                         {appointment.issue_summary || t("appointments.noSummary", "No summary provided")}
                       </p>
                     </div>
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedAppointment(appointment)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
-                      >
-                        {t("appointments.viewDetails", "View Details")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleCancelAppointment(appointment)}
-                        disabled={cancellingId === appointment.id || appointment.status === "cancelled" || appointment.status === "completed"}
-                        className="flex-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-2 rounded-lg transition-colors text-sm"
-                      >
-                        {cancellingId === appointment.id ? t("appointments.cancelling", "Cancelling...") : t("appointments.cancel", "Cancel")}
-                      </button>
-                    </div>
-                    <div className="flex gap-2">
-                      {appointment.center_phone && (
-                        <a
-                          href={`tel:${appointment.center_phone}`}
-                          className="flex-1 inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-semibold py-2 rounded-lg transition-colors text-sm"
+                    <div className="pt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-800/40 p-3 space-y-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedAppointment(appointment)}
+                          className="inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
                         >
-                          <Phone className="w-4 h-4" />
-                          {t("appointments.callCenter", "Call Center")}
-                        </a>
-                      )}
+                          <Eye className="w-4 h-4" />
+                          {t("appointments.viewDetails", "View Details")}
+                        </button>
+                        {appointment.status !== "completed" && (
+                          <button
+                            type="button"
+                            onClick={() => removeAppointment(appointment, "cancel")}
+                            disabled={deletingId === appointment.id}
+                            className="inline-flex items-center justify-center gap-2 bg-gray-200 hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold py-2.5 rounded-lg transition-colors text-sm"
+                          >
+                            {deletingId === appointment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                            {deletingId === appointment.id ? t("appointments.cancelling", "Cancelling...") : t("appointments.cancel", "Cancel")}
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {appointment.center_phone ? (
+                          <a
+                            href={`tel:${appointment.center_phone}`}
+                            className="inline-flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-semibold py-2.5 rounded-lg transition-colors text-sm"
+                          >
+                            <Phone className="w-4 h-4" />
+                            {t("appointments.callCenter", "Call Center")}
+                          </a>
+                        ) : (
+                          <span className="hidden sm:block" />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => openDirections(appointment)}
+                          className="inline-flex items-center justify-center gap-2 bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold py-2.5 rounded-lg transition-colors text-sm"
+                        >
+                          <Navigation className="w-4 h-4" />
+                          {t("appointments.directions", "Directions")}
+                        </button>
+                      </div>
+
                       <button
                         type="button"
-                        onClick={() => openDirections(appointment)}
-                        className="flex-1 inline-flex items-center justify-center gap-2 bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:hover:bg-sky-500/20 text-sky-700 dark:text-sky-300 font-semibold py-2 rounded-lg transition-colors text-sm"
+                        onClick={() => removeAppointment(appointment, "delete")}
+                        disabled={deletingId === appointment.id}
+                        className="w-full inline-flex items-center justify-center gap-2 bg-rose-50 hover:bg-rose-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 font-semibold py-2.5 rounded-lg transition-colors text-sm"
                       >
-                        <Navigation className="w-4 h-4" />
-                        {t("appointments.directions", "Directions")}
+                        {deletingId === appointment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                        {deletingId === appointment.id ? t("appointments.deleting", "Deleting...") : t("appointments.delete", "Delete Appointment")}
                       </button>
                     </div>
                   </div>
@@ -422,12 +462,14 @@ export default function AppointmentsPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  onClick={() => handleCancelAppointment(selectedAppointment)}
-                  disabled={cancellingId === selectedAppointment.id || selectedAppointment.status === "cancelled" || selectedAppointment.status === "completed"}
+                  onClick={() => removeAppointment(selectedAppointment, selectedAppointment.status === "completed" ? "delete" : "cancel")}
+                  disabled={deletingId === selectedAppointment.id}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-gray-900 text-white px-4 py-3 font-semibold hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {cancellingId === selectedAppointment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  {t("appointments.cancel", "Cancel")}
+                  {deletingId === selectedAppointment.id ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  {selectedAppointment.status === "completed"
+                    ? t("appointments.delete", "Delete")
+                    : t("appointments.cancel", "Cancel")}
                 </button>
                 <button
                   type="button"

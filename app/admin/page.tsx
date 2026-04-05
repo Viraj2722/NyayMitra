@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Lock, Plus, Activity, Database, LogOut, ShieldAlert, Calendar, BarChart3 } from "lucide-react";
+import { Lock, Plus, Activity, Database, LogOut, ShieldAlert, Calendar, BarChart3, CheckCircle2, RotateCcw, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { createLegalAidCenterDataConnect } from "@/lib/dataConnect";
 import { db } from "@/lib/firebase";
-import { collection, limit, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
-
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, Timestamp, updateDoc } from "firebase/firestore";
 
 type Center = {
   id: string;
@@ -67,6 +66,9 @@ export default function AdminPage() {
   const [recentAppointments, setRecentAppointments] = useState<AppointmentRow[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [updatingAppointmentId, setUpdatingAppointmentId] = useState<string | null>(null);
+  const [deletingAppointmentId, setDeletingAppointmentId] = useState<string | null>(null);
+  const [adminActionMessage, setAdminActionMessage] = useState("");
   const liveCenters = centers.length;
   const liveQueries = recentQueries.length;
   const liveAppointments = recentAppointments.length;
@@ -115,39 +117,46 @@ export default function AdminPage() {
     setSavingCenter(true);
 
     try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: centerName,
-          phone: centerPhone,
-          address: centerAddress,
-          categories: centerCategories.split(",").map((value) => value.trim()).filter(Boolean),
-          languages: centerLanguages.split(",").map((value) => value.trim()).filter(Boolean),
-          services: centerServices.split(",").map((value) => value.trim()).filter(Boolean),
-          description: centerDescription,
-          timings: centerTimings,
-          emergency: centerEmergency,
-          priority: centerPriority,
-          freeServices: true,
-        }),
+      const categories = centerCategories
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const languages = centerLanguages
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const services = centerServices
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      const created = await createLegalAidCenterDataConnect({
+        name: centerName,
+        phone: centerPhone,
+        address: centerAddress,
+        categories,
+        languages,
+        services,
+        description: centerDescription,
+        timings: centerTimings,
+        emergency: centerEmergency,
+        priority: centerPriority,
+        freeServices: true,
+        latitude: 0,
+        longitude: 0,
       });
 
-      if (!response.ok) {
-        let errorMessage = "Failed to save center";
-        try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMessage = errorData.error;
-          }
-        } catch {
-          // ignore parsing error
-        }
-        throw new Error(errorMessage);
+      if (!created.ok) {
+        throw new Error(created.error || "Failed to save center");
       }
 
-      const created = await response.json();
-      setCenterMessage("Center saved to the database.");
+      setCenterMessage(
+        created.mode === "dataconnect"
+          ? created.mirrored
+            ? "Center saved to Data Connect and mirrored to Firestore dashboard."
+            : "Center saved to Data Connect, but the Firestore mirror could not be verified."
+          : "Data Connect create op was unavailable, so the center was saved to the Firestore mirror instead.",
+      );
       setCenterName("");
       setCenterPhone("");
       setCenterAddress("");
@@ -183,6 +192,68 @@ export default function AdminPage() {
     }
 
     return undefined;
+  };
+
+  const normalizeAppointmentStatus = (value: unknown): "pending" | "confirmed" | "completed" => {
+    const normalized = String(value || "pending").toLowerCase();
+    if (normalized === "confirmed" || normalized === "completed") {
+      return normalized;
+    }
+    return "pending";
+  };
+
+  const getAppointmentStatusClass = (status?: string) => {
+    const normalized = normalizeAppointmentStatus(status);
+    if (normalized === "pending") {
+      return "bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300";
+    }
+    if (normalized === "confirmed") {
+      return "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    }
+    return "bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300";
+  };
+
+  const updateAppointmentStatus = async (
+    appointmentId: string,
+    status: "pending" | "confirmed" | "completed",
+  ) => {
+    try {
+      setUpdatingAppointmentId(appointmentId);
+      setError("");
+      setAdminActionMessage("");
+
+      await updateDoc(doc(db, "appointments", appointmentId), {
+        status,
+        updated_at: serverTimestamp(),
+      });
+
+      setAdminActionMessage(`Appointment updated to ${status}.`);
+    } catch (actionError) {
+      console.error("Failed to update appointment status", actionError);
+      setError("Unable to update appointment status right now.");
+    } finally {
+      setUpdatingAppointmentId(null);
+    }
+  };
+
+  const deleteAppointment = async (appointmentId: string) => {
+    try {
+      const confirmed = window.confirm("Delete this appointment permanently?");
+      if (!confirmed) {
+        return;
+      }
+
+      setDeletingAppointmentId(appointmentId);
+      setError("");
+      setAdminActionMessage("");
+      await deleteDoc(doc(db, "appointments", appointmentId));
+      setAdminActionMessage("Appointment deleted successfully.");
+    } catch (actionError) {
+      console.error("Failed to delete appointment", actionError);
+      setError("Unable to delete appointment right now.");
+    } finally {
+      setDeletingAppointmentId(null);
+    }
   };
 
   const loadData = useCallback(() => {
@@ -253,24 +324,30 @@ export default function AdminPage() {
     const unsubscribeAppointments = onSnapshot(
       appointmentsQuery,
       (snapshot) => {
-        const appointmentRows = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            user_id: data.user_id,
-            center_id: data.center_id,
-            center_name: data.center_name,
-            center_address: data.center_address,
-            center_phone: data.center_phone,
-            name: data.name,
-            phone: data.phone,
-            issue_summary: data.issue_summary,
-            date: data.date,
-            time: data.time,
-            status: data.status,
-            created_at: normalizeTimestamp(data.created_at),
-          };
-        });
+        const appointmentRows = snapshot.docs
+          .map((doc) => {
+            const data = doc.data();
+            if (String(data.status || "pending").toLowerCase() === "cancelled") {
+              return null;
+            }
+
+            return {
+              id: doc.id,
+              user_id: data.user_id,
+              center_id: data.center_id,
+              center_name: data.center_name,
+              center_address: data.center_address,
+              center_phone: data.center_phone,
+              name: data.name,
+              phone: data.phone,
+              issue_summary: data.issue_summary,
+              date: data.date,
+              time: data.time,
+              status: normalizeAppointmentStatus(data.status),
+              created_at: normalizeTimestamp(data.created_at),
+            };
+          })
+          .filter((row): row is AppointmentRow => Boolean(row));
 
         setRecentAppointments(appointmentRows);
         setLastUpdated(new Date().toLocaleTimeString());
@@ -404,6 +481,12 @@ export default function AdminPage() {
           </div>
         )}
 
+        {adminActionMessage && (
+          <div className="rounded-2xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-200">
+            {adminActionMessage}
+          </div>
+        )}
+
         <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-3">
           <span>Live Firestore listeners active.</span>
           <span>{lastUpdated ? `Last updated at ${lastUpdated}` : "Waiting for first snapshot..."}</span>
@@ -503,12 +586,13 @@ export default function AdminPage() {
                       <th className="pb-3 pr-4 font-semibold">Center</th>
                       <th className="pb-3 pr-4 font-semibold">Date</th>
                       <th className="pb-3 pr-4 font-semibold">Status</th>
+                      <th className="pb-3 pr-4 font-semibold text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="text-sm text-gray-800 dark:text-gray-200">
                     {recentAppointments.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={6} className="py-8 text-center text-gray-500 dark:text-gray-400">
                           No recent appointments found.
                         </td>
                       </tr>
@@ -528,9 +612,55 @@ export default function AdminPage() {
                         </td>
                         <td className="py-4 pr-4 text-gray-600 dark:text-gray-300">{appointment.date || "Unknown"}{appointment.time ? `, ${appointment.time}` : ""}</td>
                         <td className="py-4">
-                          <span className={`inline-flex items-center rounded-full px-3 py-1 font-semibold ${appointment.status === "pending" ? "bg-yellow-50 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-300" : "bg-green-50 dark:bg-green-500/10 text-green-700 dark:text-green-300"}`}>
-                            {appointment.status || "pending"}
+                          <span className={`inline-flex items-center rounded-full px-3 py-1 font-semibold capitalize ${getAppointmentStatusClass(appointment.status)}`}>
+                            {normalizeAppointmentStatus(appointment.status)}
                           </span>
+                        </td>
+                        <td className="py-4 pr-0 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            {normalizeAppointmentStatus(appointment.status) === "pending" && (
+                              <button
+                                type="button"
+                                onClick={() => updateAppointmentStatus(appointment.id, "confirmed")}
+                                disabled={updatingAppointmentId === appointment.id || deletingAppointmentId === appointment.id}
+                                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20 disabled:opacity-60"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Confirm
+                              </button>
+                            )}
+                            {normalizeAppointmentStatus(appointment.status) === "confirmed" && (
+                              <button
+                                type="button"
+                                onClick={() => updateAppointmentStatus(appointment.id, "completed")}
+                                disabled={updatingAppointmentId === appointment.id || deletingAppointmentId === appointment.id}
+                                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:hover:bg-blue-500/20 disabled:opacity-60"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                Complete
+                              </button>
+                            )}
+                            {normalizeAppointmentStatus(appointment.status) === "completed" && (
+                              <button
+                                type="button"
+                                onClick={() => updateAppointmentStatus(appointment.id, "pending")}
+                                disabled={updatingAppointmentId === appointment.id || deletingAppointmentId === appointment.id}
+                                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold bg-yellow-50 text-yellow-700 hover:bg-yellow-100 dark:bg-yellow-500/10 dark:text-yellow-300 dark:hover:bg-yellow-500/20 disabled:opacity-60"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                Reopen
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => deleteAppointment(appointment.id)}
+                              disabled={updatingAppointmentId === appointment.id || deletingAppointmentId === appointment.id}
+                              className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20 disabled:opacity-60"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              {deletingAppointmentId === appointment.id ? "Deleting" : "Delete"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

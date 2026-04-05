@@ -146,6 +146,49 @@ mutation CreateAppointmentWithCenter(
   )
 }
 
+query ListAppointmentsByUserId($userId: UUID!, $limit: Int!) @auth(level: PUBLIC) {
+  appointments(
+    where: { userId: { eq: $userId } }
+    orderBy: [{ createdAt: DESC }]
+    limit: $limit
+  ) {
+    id
+    userName
+    userContact
+    problemSummary
+    preferredDate
+    preferredTime
+    status
+    createdAt
+    legalAidCenter {
+      id
+      name
+      address
+      phone
+    }
+  }
+}
+
+query ListLegalAidCenters($limit: Int!) @auth(level: PUBLIC) {
+  legalAidCenters(orderBy: [{ createdAt: DESC }], limit: $limit) {
+    id
+    name
+    address
+    phone
+    latitude
+    longitude
+    freeServices
+    categories
+    timings
+    description
+    createdAt
+  }
+}
+
+mutation DeleteAppointmentById($id: UUID!) @auth(level: PUBLIC) {
+  appointment_delete(key: { id: $id })
+}
+
 mutation CreateLegalChunk(
   $lawName: String!
   $sourceUrl: String

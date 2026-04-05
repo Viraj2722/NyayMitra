@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   MapPin,
@@ -9,11 +11,19 @@ import {
   Calendar,
   X,
   Download,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage, type AppLanguage } from "@/context/LanguageContext";
-import { createAppointmentDataConnect } from "@/lib/dataConnect";
+import {
+  createAppointmentDataConnect,
+  listLegalAidCentersDataConnect,
+} from "@/lib/dataConnect";
 import jsPDF from "jspdf";
+
+const LegalCentersMap = dynamic(() => import("@/components/LegalCentersMap"), {
+  ssr: false,
+});
 
 type Center = {
   id: string;
@@ -262,6 +272,26 @@ const normalizeCenterList = (raw: unknown): Center[] => {
     .filter((item): item is Center => Boolean(item));
 };
 
+const dedupeCenters = (raw: Center[]): Center[] => {
+  const seen = new Set<string>();
+  const deduped: Center[] = [];
+
+  for (const center of raw) {
+    const key = [
+      center.id,
+      center.name.trim().toLowerCase(),
+      center.latitude?.toFixed(4),
+      center.longitude?.toFixed(4),
+    ].join("|");
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(center);
+  }
+
+  return deduped;
+};
+
 const normalizeEmergencyNumbers = (raw: unknown): EmergencyNumber[] => {
   if (!Array.isArray(raw)) return [];
 
@@ -376,6 +406,60 @@ const buildMapsQuery = (
   return "Nearby Legal Aid Center";
 };
 
+const buildGoogleMapsUrl = (
+  center: Center,
+  userLocation: UserLocation | null,
+): string => {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    buildMapsQuery(center, userLocation),
+  )}`;
+};
+
+const NEARBY_CENTER_RADIUS_KM = 40;
+const NEARBY_CENTER_LIMIT = 6;
+
+const getNearbyCenters = (
+  centers: Center[],
+  userLocation: UserLocation | null,
+): Center[] => {
+  const withDistances = centers
+    .map((center) => {
+      if (
+        userLocation &&
+        typeof center.latitude === "number" &&
+        typeof center.longitude === "number"
+      ) {
+        return {
+          ...center,
+          distance: haversineKm(userLocation, {
+            lat: center.latitude,
+            lng: center.longitude,
+          }),
+        };
+      }
+
+      return center;
+    })
+    .sort(
+      (a, b) =>
+        (a.distance ?? Number.POSITIVE_INFINITY) -
+        (b.distance ?? Number.POSITIVE_INFINITY),
+    );
+
+  const nearby = userLocation
+    ? withDistances.filter(
+        (center) =>
+          typeof center.distance !== "number" ||
+          center.distance <= NEARBY_CENTER_RADIUS_KM,
+      )
+    : withDistances;
+
+  return (nearby.length > 0 ? nearby : withDistances).slice(
+    0,
+    NEARBY_CENTER_LIMIT,
+  );
+};
+
 const getSafetyCopy = (language: string) => {
   const normalized = (language || "English").toLowerCase();
 
@@ -431,6 +515,7 @@ export default function ResultsPage() {
   const { t, language } = useLanguage();
   const selectedLanguage = language as AppLanguage;
   const { user } = useAuth();
+  const router = useRouter();
 
   const getCategoryLabel = (cat: string) => {
     const c = cat.toLowerCase();
@@ -456,6 +541,12 @@ export default function ResultsPage() {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [pdfStatusMessage, setPdfStatusMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showBookingPopup, setShowBookingPopup] = useState(false);
+  const [lastBookedSummary, setLastBookedSummary] = useState<{
+    centerName: string;
+    preferredDate: string;
+    preferredTime?: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
   const [loadingCenters, setLoadingCenters] = useState(true);
@@ -528,6 +619,7 @@ export default function ResultsPage() {
 
         const storedSession = sessionStorage.getItem("nyaymitra_chat_session");
         const parsedLocation = parseUserLocation(storedSession);
+        const currentLocation = parsedLocation;
         if (parsedLocation) {
           setUserLocation(parsedLocation);
         }
@@ -581,74 +673,73 @@ export default function ResultsPage() {
           "nyaymitra_map_search_query",
         );
         const storedCitations = localStorage.getItem("nyaymitra_citations");
-        const storedCenters = localStorage.getItem("nyaymitra_centers");
-        const normalizedStoredCenters = storedCenters
-          ? normalizeCenterList(JSON.parse(storedCenters))
-          : [];
+        const rankByDistance = (rawCenters: Center[]) => {
+          const withDistances = rawCenters.map((center) => {
+            if (
+              currentLocation &&
+              typeof center.latitude === "number" &&
+              typeof center.longitude === "number"
+            ) {
+              return {
+                ...center,
+                distance: haversineKm(currentLocation, {
+                  lat: center.latitude,
+                  lng: center.longitude,
+                }),
+              };
+            }
+            return center;
+          });
 
-        const withDistances = normalizedStoredCenters.map((center) => {
-          if (
-            userLocation &&
-            typeof center.latitude === "number" &&
-            typeof center.longitude === "number"
-          ) {
-            return {
-              ...center,
-              distance: haversineKm(userLocation, {
-                lat: center.latitude,
-                lng: center.longitude,
-              }),
-            };
-          }
+          withDistances.sort(
+            (a, b) =>
+              (a.distance ?? Number.POSITIVE_INFINITY) -
+              (b.distance ?? Number.POSITIVE_INFINITY),
+          );
+          return withDistances;
+        };
 
-          return center;
-        });
-
-        withDistances.sort(
-          (a, b) =>
-            (a.distance ?? Number.POSITIVE_INFINITY) -
-            (b.distance ?? Number.POSITIVE_INFINITY),
+        // 1) Primary source: Data Connect schema (legalAidCenters table)
+        const dataConnectCenters = dedupeCenters(
+          (await listLegalAidCentersDataConnect(250)).map((center) => ({
+            ...center,
+            lat: center.latitude,
+            lng: center.longitude,
+            source: "dataconnect",
+          })),
         );
 
-        if (withDistances.length > 0) {
-          setCenters(withDistances);
-        } else {
-          const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`);
-          if (response.ok) {
-            const liveCenters = normalizeCenterList(await response.json()).map(
-              (center) => {
-                if (
-                  userLocation &&
-                  typeof center.latitude === "number" &&
-                  typeof center.longitude === "number"
-                ) {
-                  return {
-                    ...center,
-                    distance: haversineKm(userLocation, {
-                      lat: center.latitude,
-                      lng: center.longitude,
-                    }),
-                  };
-                }
+        let finalCenters: Center[] = [];
 
-                return center;
-              },
-            );
-            liveCenters.sort(
-              (a, b) =>
-                (a.distance ?? Number.POSITIVE_INFINITY) -
-                (b.distance ?? Number.POSITIVE_INFINITY),
-            );
-            setCenters(liveCenters);
+        if (dataConnectCenters.length > 0) {
+          finalCenters = rankByDistance(dataConnectCenters);
+          setCenters(finalCenters);
+        } else {
+          // 2) Fallbacks: local cache -> backend endpoint
+          const storedCenters = localStorage.getItem("nyaymitra_centers");
+          const normalizedStoredCenters = storedCenters
+            ? normalizeCenterList(JSON.parse(storedCenters))
+            : [];
+
+          if (normalizedStoredCenters.length > 0) {
+            finalCenters = rankByDistance(normalizedStoredCenters);
+            setCenters(finalCenters);
           } else {
-            setCenters([]);
+            const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`);
+            if (response.ok) {
+              const liveCenters = normalizeCenterList(await response.json());
+              finalCenters = rankByDistance(liveCenters);
+              setCenters(finalCenters);
+            } else {
+              setCenters([]);
+            }
           }
         }
 
-        if (storedMapQuery && storedMapQuery.trim().length > 0) {
+        if (finalCenters[0]) {
+          setMapSearchQuery(buildMapsQuery(finalCenters[0], currentLocation));
+        } else if (storedMapQuery && storedMapQuery.trim().length > 0) {
           setMapSearchQuery(storedMapQuery);
-        } else if (withDistances[0]) {
-          setMapSearchQuery(buildMapsQuery(withDistances[0], userLocation));
         } else if (storedCategory && storedCategory.trim().length > 0) {
           setMapSearchQuery(`Nearest ${storedCategory} legal aid center`);
         }
@@ -724,6 +815,22 @@ export default function ResultsPage() {
     emergencyActions.find((item) => item.number === "112") ||
     emergencyActions[0];
   const safetyCopy = getSafetyCopy(language);
+  const nearbyCenters = getNearbyCenters(centers, userLocation);
+  const mapRenderableCenters = nearbyCenters
+    .filter(
+      (center) =>
+        typeof center.latitude === "number" &&
+        typeof center.longitude === "number",
+    )
+    .map((center) => ({
+      id: center.id,
+      name: center.name,
+      address: center.address,
+      phone: center.phone,
+      latitude: center.latitude as number,
+      longitude: center.longitude as number,
+      distance: center.distance,
+    }));
 
   const generatePDF = async () => {
     setIsGeneratingPDF(true);
@@ -1161,6 +1268,17 @@ export default function ResultsPage() {
     setIsSubmitting(true);
     setError(null);
 
+    if (!user?.uid) {
+      setError(
+        t(
+          "results.loginRequiredForBooking",
+          "Please sign in again before booking an appointment.",
+        ),
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
     const formData = new FormData(e.target as HTMLFormElement);
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;
@@ -1183,7 +1301,7 @@ export default function ResultsPage() {
 
     try {
       const saved = await createAppointmentDataConnect({
-        userId: user ? user.uid : "anonymous",
+        userId: user.uid,
         legalAidCenterId: selectedCenter!.id,
         centerName: selectedCenter!.name,
         centerAddress: selectedCenter!.address,
@@ -1202,6 +1320,12 @@ export default function ResultsPage() {
       if (saved) {
         setIsBooking(false);
         setSuccess(true);
+        setLastBookedSummary({
+          centerName: selectedCenter?.name || "Legal Aid Center",
+          preferredDate: date,
+          preferredTime: time || undefined,
+        });
+        setShowBookingPopup(true);
         setTimeout(() => setSuccess(false), 5000);
       } else {
         setError(
@@ -1436,7 +1560,7 @@ export default function ResultsPage() {
         </section>
 
         {/* Next Steps & Centers */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 print:grid-cols-1 print:block print:!bg-white print:!text-black">
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:items-start print:grid-cols-1 print:block print:!bg-white print:!text-black">
           <div className="print:mb-8">
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200 print:border-gray-500">
               <CheckCircle className="w-6 h-6 text-[var(--color-deep-blue)] print:!text-black" />
@@ -1467,7 +1591,7 @@ export default function ResultsPage() {
             </ol>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200 print:hidden">
               <MapPin className="w-6 h-6 text-green-600" />
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -1475,17 +1599,24 @@ export default function ResultsPage() {
               </h2>
             </div>
 
-            {/* Map Placeholder */}
-            <div className="w-full h-48 bg-gray-200 dark:bg-zinc-800 rounded-xl mb-4 overflow-hidden relative shadow-inner print:hidden">
-              <iframe
-                width="100%"
-                height="100%"
-                frameBorder="0"
-                scrolling="no"
-                marginHeight={0}
-                marginWidth={0}
-                src={`https://maps.google.com/maps?width=100%25&height=600&hl=en&q=${encodeURIComponent(mapSearchQuery || "Nearby Legal Aid Center")}&t=&z=13&ie=UTF8&iwloc=B&output=embed`}
-              ></iframe>
+            {/* Multi-marker map from Data Connect centers */}
+            <div className="w-full h-56 bg-gray-200 dark:bg-zinc-800 rounded-2xl mb-4 overflow-hidden relative isolate shadow-inner print:hidden border border-gray-200 dark:border-zinc-700">
+              {mapRenderableCenters.length > 0 ? (
+                <LegalCentersMap
+                  centers={mapRenderableCenters}
+                  userLocation={userLocation}
+                />
+              ) : (
+                <iframe
+                  width="100%"
+                  height="100%"
+                  frameBorder="0"
+                  scrolling="no"
+                  marginHeight={0}
+                  marginWidth={0}
+                  src={`https://maps.google.com/maps?width=100%25&height=600&hl=en&q=${encodeURIComponent(mapSearchQuery || "Nearby Legal Aid Center")}&t=&z=13&ie=UTF8&iwloc=B&output=embed`}
+                ></iframe>
+              )}
             </div>
 
             {emergencyNumbers.length > 0 && (
@@ -1529,16 +1660,35 @@ export default function ResultsPage() {
                   )}
                 </div>
               )}
-              {centers.map((center) => (
+              {nearbyCenters.map((center) => (
                 <div
                   key={center.id}
-                  className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow"
+                  onClick={() => {
+                    window.open(
+                      buildGoogleMapsUrl(center, userLocation),
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
+                  }}
+                  role="link"
+                  tabIndex={0}
+                  className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-gray-100 dark:border-zinc-800 flex items-start justify-between gap-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer min-w-0"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      window.open(
+                        buildGoogleMapsUrl(center, userLocation),
+                        "_blank",
+                        "noopener,noreferrer",
+                      );
+                    }
+                  }}
                 >
-                  <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-bold text-gray-900 dark:text-white break-words">
                       {center.name}
                     </h4>
-                    <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
+                    <p className="text-xs text-gray-500 dark:text-gray-300 mt-1 break-words">
                       {center.address}
                       {typeof center.distance === "number"
                         ? ` • ${center.distance.toFixed(2)} km`
@@ -1554,20 +1704,34 @@ export default function ResultsPage() {
                           target="_blank"
                           rel="noreferrer"
                           className="text-xs text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold mt-1 inline-block print:hidden"
+                          onClick={(event) => event.stopPropagation()}
                         >
                           Open exact location
                         </a>
                       )}
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedCenter(center);
-                      setIsBooking(true);
-                    }}
-                    className="flex-shrink-0 bg-blue-50 text-[var(--color-deep-blue)] hover:bg-[var(--color-deep-blue)] hover:text-white px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors print:hidden"
-                  >
-                    {t("results.book", "Book")}
-                  </button>
+                  <div className="flex flex-col items-stretch sm:items-end gap-2 shrink-0">
+                    <a
+                      href={buildGoogleMapsUrl(center, userLocation)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-emerald-50 px-3.5 py-2 text-sm font-semibold text-emerald-800 shadow-sm hover:bg-emerald-100 hover:text-emerald-900 transition-colors whitespace-nowrap print:hidden"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Open map
+                    </a>
+                    <button
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setSelectedCenter(center);
+                        setIsBooking(true);
+                      }}
+                      className="inline-flex items-center justify-center rounded-full bg-blue-50 px-3.5 py-2 text-sm font-semibold text-[var(--color-deep-blue)] shadow-sm hover:bg-[var(--color-deep-blue)] hover:text-white transition-colors whitespace-nowrap print:hidden"
+                    >
+                      {t("results.book", "Book")}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1740,6 +1904,59 @@ export default function ResultsPage() {
               "Your appointment request has been sent!",
             )}
           </span>
+        </div>
+      )}
+
+      {showBookingPopup && lastBookedSummary && (
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-green-700 dark:text-green-400 font-bold">
+                  {t("results.bookingConfirmed", "Booking Confirmed")}
+                </p>
+                <h3 className="mt-1 text-xl font-extrabold text-zinc-900 dark:text-zinc-100">
+                  {t("results.requestSent", "Your appointment request has been sent!")}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBookingPopup(false)}
+                className="rounded-full p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                aria-label={t("common.close", "Close")}
+              >
+                <X className="w-5 h-5 text-zinc-600 dark:text-zinc-300" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 p-4 text-sm space-y-1.5">
+              <p><span className="font-semibold">{t("results.center", "Center")}:</span> {lastBookedSummary.centerName}</p>
+              <p><span className="font-semibold">{t("results.date", "Date")}:</span> {lastBookedSummary.preferredDate}</p>
+              {lastBookedSummary.preferredTime && (
+                <p><span className="font-semibold">{t("results.time", "Time")}:</span> {lastBookedSummary.preferredTime}</p>
+              )}
+            </div>
+
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowBookingPopup(false)}
+                className="flex-1 py-2.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 font-semibold text-zinc-900 dark:text-zinc-100"
+              >
+                {t("common.close", "Close")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBookingPopup(false);
+                  router.push("/appointments");
+                }}
+                className="flex-1 py-2.5 rounded-lg bg-[var(--color-deep-blue)] hover:bg-blue-900 text-white font-semibold"
+              >
+                {t("appointments.title", "View Appointments")}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {/* HIDDEN INVISIBLE PDF TEMPLATE */}

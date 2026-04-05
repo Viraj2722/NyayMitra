@@ -104,6 +104,14 @@ export interface CreateUserVariables {
   mobile?: string | null;
 }
 
+export interface DeleteAppointmentByIdData {
+  appointment_delete?: Appointment_Key | null;
+}
+
+export interface DeleteAppointmentByIdVariables {
+  id: UUIDString;
+}
+
 export interface GetUserByUidData {
   users: ({
     id: UUIDString;
@@ -126,6 +134,50 @@ export interface LegalAidCenter_Key {
 export interface LegalChunk_Key {
   id: UUIDString;
   __typename?: 'LegalChunk_Key';
+}
+
+export interface ListAppointmentsByUserIdData {
+  appointments: ({
+    id: UUIDString;
+    userName: string;
+    userContact: string;
+    problemSummary: string;
+    preferredDate: DateString;
+    preferredTime?: string | null;
+    status: string;
+    createdAt: TimestampString;
+    legalAidCenter: {
+      id: UUIDString;
+      name: string;
+      address: string;
+      phone: string;
+    } & LegalAidCenter_Key;
+  } & Appointment_Key)[];
+}
+
+export interface ListAppointmentsByUserIdVariables {
+  userId: UUIDString;
+  limit: number;
+}
+
+export interface ListLegalAidCentersData {
+  legalAidCenters: ({
+    id: UUIDString;
+    name: string;
+    address: string;
+    phone: string;
+    latitude: number;
+    longitude: number;
+    freeServices: boolean;
+    categories: string[];
+    timings?: string | null;
+    description?: string | null;
+    createdAt: TimestampString;
+  } & LegalAidCenter_Key)[];
+}
+
+export interface ListLegalAidCentersVariables {
+  limit: number;
 }
 
 export interface ListLegalChunksByLawData {
@@ -294,6 +346,42 @@ export const createAppointmentWithCenterRef: CreateAppointmentWithCenterRef;
 
 export function createAppointmentWithCenter(vars: CreateAppointmentWithCenterVariables): MutationPromise<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
 export function createAppointmentWithCenter(dc: DataConnect, vars: CreateAppointmentWithCenterVariables): MutationPromise<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+
+interface ListAppointmentsByUserIdRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ListAppointmentsByUserIdVariables): QueryRef<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: ListAppointmentsByUserIdVariables): QueryRef<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+  operationName: string;
+}
+export const listAppointmentsByUserIdRef: ListAppointmentsByUserIdRef;
+
+export function listAppointmentsByUserId(vars: ListAppointmentsByUserIdVariables, options?: ExecuteQueryOptions): QueryPromise<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+export function listAppointmentsByUserId(dc: DataConnect, vars: ListAppointmentsByUserIdVariables, options?: ExecuteQueryOptions): QueryPromise<ListAppointmentsByUserIdData, ListAppointmentsByUserIdVariables>;
+
+interface ListLegalAidCentersRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ListLegalAidCentersVariables): QueryRef<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: ListLegalAidCentersVariables): QueryRef<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+  operationName: string;
+}
+export const listLegalAidCentersRef: ListLegalAidCentersRef;
+
+export function listLegalAidCenters(vars: ListLegalAidCentersVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+export function listLegalAidCenters(dc: DataConnect, vars: ListLegalAidCentersVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalAidCentersData, ListLegalAidCentersVariables>;
+
+interface DeleteAppointmentByIdRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: DeleteAppointmentByIdVariables): MutationRef<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: DeleteAppointmentByIdVariables): MutationRef<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+  operationName: string;
+}
+export const deleteAppointmentByIdRef: DeleteAppointmentByIdRef;
+
+export function deleteAppointmentById(vars: DeleteAppointmentByIdVariables): MutationPromise<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
+export function deleteAppointmentById(dc: DataConnect, vars: DeleteAppointmentByIdVariables): MutationPromise<DeleteAppointmentByIdData, DeleteAppointmentByIdVariables>;
 
 interface CreateLegalChunkRef {
   /* Allow users to create refs without passing in DataConnect */
