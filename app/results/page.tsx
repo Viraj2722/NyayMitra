@@ -1157,14 +1157,14 @@ export default function ResultsPage() {
       }
 
       drawSectionHeading("Nearby Legal Aid Centers");
-      if (centers.length === 0) {
+      if (nearbyCenters.length === 0) {
         writeText("No legal aid centers found.", {
           size: 9.5,
           color: [120, 120, 120],
           gap: 4,
         });
       } else {
-        centers.forEach((center, i) => {
+        nearbyCenters.forEach((center, i) => {
           const titleBase = `${i + 1}. ${center.name}`;
           const distanceSuffix =
             typeof center.distance === "number"

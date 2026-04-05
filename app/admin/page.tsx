@@ -59,6 +59,8 @@ export default function AdminPage() {
   const [centerTimings, setCenterTimings] = useState("Mon-Sat 10AM-5PM");
   const [centerEmergency, setCenterEmergency] = useState(true);
   const [centerPriority, setCenterPriority] = useState(10);
+  const [centerLatitude, setCenterLatitude] = useState(0);
+  const [centerLongitude, setCenterLongitude] = useState(0);
   const [centerMessage, setCenterMessage] = useState("");
   const [savingCenter, setSavingCenter] = useState(false);
   const [centers, setCenters] = useState<Center[]>([]);
@@ -142,21 +144,15 @@ export default function AdminPage() {
         emergency: centerEmergency,
         priority: centerPriority,
         freeServices: true,
-        latitude: 0,
-        longitude: 0,
+        latitude: centerLatitude,
+        longitude: centerLongitude,
       });
 
       if (!created.ok) {
         throw new Error(created.error || "Failed to save center");
       }
 
-      setCenterMessage(
-        created.mode === "dataconnect"
-          ? created.mirrored
-            ? "Center saved to Data Connect and mirrored to Firestore dashboard."
-            : "Center saved to Data Connect, but the Firestore mirror could not be verified."
-          : "Data Connect create op was unavailable, so the center was saved to the Firestore mirror instead.",
-      );
+      setCenterMessage("Center saved to database successfully.");
       setCenterName("");
       setCenterPhone("");
       setCenterAddress("");
@@ -167,6 +163,8 @@ export default function AdminPage() {
       setCenterTimings("Mon-Sat 10AM-5PM");
       setCenterEmergency(true);
       setCenterPriority(10);
+      setCenterLatitude(0);
+      setCenterLongitude(0);
     } catch (err) {
       if (err instanceof Error) {
         setCenterMessage(err.message);
@@ -736,6 +734,17 @@ export default function AdminPage() {
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Priority</label>
                   <input value={centerPriority} onChange={(e) => setCenterPriority(Number(e.target.value))} type="number" min={0} max={100} className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Latitude</label>
+                  <input value={centerLatitude} onChange={(e) => setCenterLatitude(Number(e.target.value))} type="number" step="0.000001" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="e.g., 28.6139" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1 uppercase tracking-wide">Longitude</label>
+                  <input value={centerLongitude} onChange={(e) => setCenterLongitude(Number(e.target.value))} type="number" step="0.000001" className="w-full bg-gray-50 dark:bg-zinc-950 text-gray-900 dark:text-white border border-transparent dark:border-zinc-800 rounded-xl px-3 py-2.5 text-sm focus:bg-white dark:focus:bg-zinc-950 focus:border-[var(--color-deep-blue)] outline-none transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="e.g., 77.2090" />
                 </div>
               </div>
 
