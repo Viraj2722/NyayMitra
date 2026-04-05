@@ -6,7 +6,7 @@ import tempfile
 from typing import Dict, List, Optional, Tuple
 
 import requests
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader
 
 

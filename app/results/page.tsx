@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage, type AppLanguage } from "@/context/LanguageContext";
 import { createAppointmentDataConnect } from "@/lib/dataConnect";
+import jsPDF from "jspdf";
 
 type Center = {
   id: string;
@@ -82,6 +83,90 @@ const PDF_BTN_LABELS: Record<AppLanguage, string> = {
   Punjabi: "ਕਾਨੂੰਨੀ ਰਿਪੋਰਟ ਡਾਊਨਲੋਡ ਕਰੋ (PDF)",
   Urdu: "قانونی رپورٹ ڈاؤن لوڈ کریں (PDF)",
 };
+
+const PDF_PROGRESS_LABELS: Record<AppLanguage, string> = {
+  English: "Downloading report...",
+  Hindi: "रिपोर्ट डाउनलोड हो रही है...",
+  Marathi: "अहवाल डाउनलोड होत आहे...",
+  Bengali: "রিপোর্ট ডাউনলোড হচ্ছে...",
+  Gujarati: "રિપોર્ટ ડાઉનલોડ થઈ રહ્યો છે...",
+  Tamil: "அறிக்கை பதிவிறக்கப்படுகிறது...",
+  Telugu: "రిపోర్ట్ డౌన్‌లోడ్ అవుతోంది...",
+  Kannada: "ವರದಿ ಡೌನ್‌ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
+  Malayalam: "റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യുന്നു...",
+  Punjabi: "ਰਿਪੋਰਟ ਡਾਊਨਲੋਡ ਹੋ ਰਹੀ ਹੈ...",
+  Urdu: "رپورٹ ڈاؤن لوڈ ہو رہی ہے...",
+};
+
+const PDF_SUCCESS_LABELS: Record<AppLanguage, string> = {
+  English: "Report downloaded successfully.",
+  Hindi: "रिपोर्ट सफलतापूर्वक डाउनलोड हो गई।",
+  Marathi: "अहवाल यशस्वीपणे डाउनलोड झाला.",
+  Bengali: "রিপোর্ট সফলভাবে ডাউনলোড হয়েছে।",
+  Gujarati: "રિપોર્ટ સફળતાપૂર્વક ડાઉનલોડ થયો.",
+  Tamil: "அறிக்கை வெற்றிகரமாக பதிவிறங்கியது.",
+  Telugu: "రిపోర్ట్ విజయవంతంగా డౌన్‌లోడ్ అయింది.",
+  Kannada: "ವರದಿ ಯಶಸ್ವಿಯಾಗಿ ಡೌನ್‌ಲೋಡ್ ಆಯಿತು.",
+  Malayalam: "റിപ്പോർട്ട് വിജയകരമായി ഡൗൺലോഡ് ചെയ്തു.",
+  Punjabi: "ਰਿਪੋਰਟ ਸਫਲਤਾਪੂਰਵਕ ਡਾਊਨਲੋਡ ਹੋ ਗਈ ਹੈ।",
+  Urdu: "رپورٹ کامیابی سے ڈاؤن لوڈ ہو گئی۔",
+};
+
+const PDF_FAILED_LABELS: Record<AppLanguage, string> = {
+  English: "Could not download report. Please try again.",
+  Hindi: "रिपोर्ट डाउनलोड नहीं हो पाई। कृपया फिर से प्रयास करें।",
+  Marathi: "अहवाल डाउनलोड होऊ शकला नाही. कृपया पुन्हा प्रयत्न करा.",
+  Bengali: "রিপোর্ট ডাউনলোড করা যায়নি। আবার চেষ্টা করুন।",
+  Gujarati: "રિપોર્ટ ડાઉનલોડ થઈ શક્યો નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
+  Tamil: "அறிக்கையை பதிவிறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+  Telugu: "రిపోర్ట్ డౌన్‌లోడ్ కాలేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
+  Kannada: "ವರದಿ ಡೌನ್‌ಲೋಡ್ ಆಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+  Malayalam: "റിപ്പോർട്ട് ഡൗൺലോഡ് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
+  Punjabi: "ਰਿਪੋਰਟ ਡਾਊਨਲੋਡ ਨਹੀਂ ਹੋਈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+  Urdu: "رپورٹ ڈاؤن لوڈ نہیں ہو سکی۔ براہ کرم دوبارہ کوشش کریں۔",
+};
+
+let cachedNotoSansDevanagariBase64: string | null = null;
+
+const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000;
+  let binary = "";
+
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    const chunk = bytes.subarray(index, index + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+
+  return btoa(binary);
+};
+
+const ensureUnicodePdfFont = async (pdf: jsPDF): Promise<string> => {
+  const fontFileName = "NotoSansDevanagari-Regular.ttf";
+  const fontAlias = "NotoSansDevanagari";
+
+  if (!cachedNotoSansDevanagariBase64) {
+    const response = await fetch(`/fonts/${fontFileName}`);
+    if (!response.ok) {
+      throw new Error(`Unable to load PDF font: ${response.status}`);
+    }
+    cachedNotoSansDevanagariBase64 = arrayBufferToBase64(
+      await response.arrayBuffer(),
+    );
+  }
+
+  pdf.addFileToVFS(fontFileName, cachedNotoSansDevanagariBase64);
+  pdf.addFont(fontFileName, fontAlias, "normal");
+  return fontAlias;
+};
+
+const needsUnicodeFont = (text: string): boolean => /[^\u0000-\u024F]/.test(text);
+
+const sanitizePdfText = (text: string): string =>
+  String(text ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const normalizeRights = (raw: unknown): RightCard[] => {
   if (!Array.isArray(raw)) return [];
@@ -368,6 +453,8 @@ export default function ResultsPage() {
   const [selectedCenter, setSelectedCenter] = useState<Center | null>(null);
   const [isBooking, setIsBooking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [pdfStatusMessage, setPdfStatusMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [centers, setCenters] = useState<Center[]>([]);
@@ -638,8 +725,435 @@ export default function ResultsPage() {
     emergencyActions[0];
   const safetyCopy = getSafetyCopy(language);
 
-  const generatePDF = () => {
-    window.print();
+  const generatePDF = async () => {
+    setIsGeneratingPDF(true);
+    setPdfStatusMessage(
+      PDF_PROGRESS_LABELS[selectedLanguage] || "Downloading report...",
+    );
+
+    try {
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const marginL = 14;
+      const marginR = 14;
+      const contentW = pageWidth - marginL - marginR;
+      let y = 0;
+
+      let unicodeFontAlias: string | null = null;
+      try {
+        unicodeFontAlias = await ensureUnicodePdfFont(pdf);
+      } catch {
+        unicodeFontAlias = null;
+      }
+
+      const setSmartFont = (style: "normal" | "bold" = "normal", text = "") => {
+        if (unicodeFontAlias && needsUnicodeFont(text)) {
+          pdf.setFont(unicodeFontAlias, "normal");
+          return;
+        }
+        pdf.setFont("helvetica", style);
+      };
+
+      const ensureSpace = (needed: number) => {
+        if (y + needed > pageHeight - 12) {
+          pdf.addPage();
+          y = 16;
+        }
+      };
+
+      const writeText = (
+        text: string,
+        options: {
+          size?: number;
+          bold?: boolean;
+          color?: [number, number, number];
+          indent?: number;
+          gap?: number;
+          maxWidth?: number;
+        } = {},
+      ) => {
+        const {
+          size = 10.5,
+          bold = false,
+          color = [30, 30, 30],
+          indent = 0,
+          gap = 3.5,
+          maxWidth,
+        } = options;
+
+        const clean = sanitizePdfText(text);
+        if (!clean) return;
+
+        pdf.setFontSize(size);
+        setSmartFont(bold ? "bold" : "normal", clean);
+        pdf.setTextColor(...color);
+
+        const wrapWidth = (maxWidth ?? contentW) - indent;
+        const lines = pdf.splitTextToSize(clean, wrapWidth);
+        const lineH = size * 0.3528 * 1.55;
+        const blockH = lines.length * lineH + gap;
+
+        ensureSpace(blockH + 2);
+        pdf.text(lines, marginL + indent, y);
+        y += blockH;
+      };
+
+      const drawHRule = (
+        color: [number, number, number] = [220, 220, 220],
+        weight = 0.3,
+      ) => {
+        ensureSpace(4);
+        pdf.setDrawColor(...color);
+        pdf.setLineWidth(weight);
+        pdf.line(marginL, y, pageWidth - marginR, y);
+        y += 4;
+      };
+
+      const drawSectionHeading = (title: string) => {
+        ensureSpace(16);
+        y += 4;
+        drawHRule([200, 200, 200], 0.25);
+        writeText(title, { size: 13, bold: true, color: [10, 25, 47], gap: 5 });
+      };
+
+      pdf.setFillColor(10, 25, 47);
+      pdf.rect(0, 0, pageWidth, 28, "F");
+      y = 10;
+
+      pdf.setFontSize(20);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(240, 165, 0);
+      pdf.text("NYAYMITRA", marginL, y);
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(200, 210, 230);
+      pdf.text("Official Legal Guidance Report", marginL, y + 8);
+
+      const badgeLabel = `URGENCY: ${String(urgency).toUpperCase()}`;
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      const badgeW = pdf.getTextWidth(badgeLabel) + 6;
+      const badgeX = pageWidth - marginR - badgeW;
+      const badgeY = 6;
+      const badgeColor: [number, number, number] =
+        urgency === "high" ? [220, 38, 38] : [22, 163, 74];
+      pdf.setFillColor(...badgeColor);
+      pdf.roundedRect(badgeX, badgeY, badgeW, 7, 1.5, 1.5, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(badgeLabel, badgeX + 3, badgeY + 4.8);
+
+      y = 34;
+
+      pdf.setFillColor(247, 248, 250);
+      pdf.rect(marginL, y, contentW, 28, "F");
+      pdf.setDrawColor(220, 220, 220);
+      pdf.setLineWidth(0.3);
+      pdf.rect(marginL, y, contentW, 28, "S");
+
+      const metaY = y + 5;
+      const col2X = marginL + contentW / 2;
+      const labelColor: [number, number, number] = [115, 115, 115];
+      const valueColor: [number, number, number] = [25, 25, 25];
+      const leftValueX = marginL + 4;
+      const rightValueX = col2X;
+      const valueWidth = contentW / 2 - 8;
+
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(...labelColor);
+      pdf.text("GENERATED FOR", marginL + 4, metaY);
+      pdf.text("DATE ISSUED", col2X, metaY);
+      pdf.text("CATEGORY", marginL + 4, metaY + 9);
+      pdf.text("CONTACT", col2X, metaY + 9);
+
+      const drawMetaValue = (
+        value: string,
+        x: number,
+        baselineY: number,
+        fontSize = 9,
+      ) => {
+        const clean = sanitizePdfText(value);
+        const lines = pdf.splitTextToSize(clean, valueWidth);
+        pdf.setFontSize(fontSize);
+        setSmartFont("normal", clean);
+        pdf.setTextColor(...valueColor);
+        pdf.text(lines, x, baselineY);
+      };
+
+      drawMetaValue(user?.displayName || "Anonymous User", leftValueX, metaY + 4.5, 9.5);
+      drawMetaValue(dateStr, rightValueX, metaY + 4.5, 9.5);
+      drawMetaValue(getCategoryLabel(category), leftValueX, metaY + 13.5, 9.5);
+      drawMetaValue(user?.email || "N/A", rightValueX, metaY + 13.5, 9);
+
+      y += 34;
+
+      drawSectionHeading("Know Your Rights");
+      if (rights.length === 0) {
+        writeText("No rights available.", {
+          size: 10,
+          color: [120, 120, 120],
+          gap: 4,
+        });
+      } else {
+        rights.forEach((right, i) => {
+          ensureSpace(24);
+          pdf.setFillColor(10, 25, 47);
+          pdf.circle(marginL + 4, y + 3.5, 3.5, "F");
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(255, 255, 255);
+          pdf.text(String(i + 1), marginL + 4, y + 4.6, { align: "center" });
+
+          writeText(right.title, {
+            size: 11.5,
+            bold: true,
+            color: [10, 25, 47],
+            indent: 11,
+            gap: 2.5,
+          });
+          writeText(right.desc || "-", {
+            size: 10,
+            color: [60, 60, 60],
+            indent: 11,
+            gap: 2.5,
+          });
+
+          const citation = citations[i];
+          if (citation) {
+            const citText = `${citation.law_name}${
+              typeof citation.page === "number" ? ` (Page ${citation.page})` : ""
+            }${citation.source_url ? ` | ${citation.source_url}` : ""}`;
+            const citLines = pdf.splitTextToSize(sanitizePdfText(citText), contentW - 19);
+            const citH = citLines.length * 3.9 + 7;
+            ensureSpace(citH + 2);
+            pdf.setFillColor(255, 251, 235);
+            pdf.setDrawColor(245, 158, 11);
+            pdf.setLineWidth(0.25);
+            pdf.roundedRect(marginL + 11, y, contentW - 11, citH, 1.5, 1.5, "FD");
+            pdf.setFontSize(8.5);
+            pdf.setFont("helvetica", "bold");
+            pdf.setTextColor(120, 80, 0);
+            pdf.text("SOURCE:", marginL + 14, y + 4.5);
+            pdf.setFontSize(8.5);
+            setSmartFont("normal", citText);
+            pdf.setTextColor(100, 70, 0);
+            pdf.text(citLines, marginL + 14, y + 8.5);
+            y += citH + 3;
+          }
+
+          y += 4;
+        });
+      }
+
+      drawSectionHeading("Next Steps");
+      if (nextSteps.length === 0) {
+        writeText("No next steps available.", {
+          size: 9.5,
+          color: [120, 120, 120],
+          gap: 4,
+        });
+      } else {
+        nextSteps.forEach((step, i) => {
+          const pillW = 22;
+          const contentIndent = 28;
+          const stepTitle = sanitizePdfText(step.title || `Step ${i + 1}`);
+          const stepDesc = sanitizePdfText(step.desc || "");
+
+          // Reserve enough space for badge + wrapped title/description block.
+          ensureSpace(stepDesc ? 28 : 20);
+
+          pdf.setFillColor(240, 165, 0);
+          pdf.roundedRect(marginL, y + 1, pillW, 6.5, 1.5, 1.5, "F");
+          pdf.setFontSize(7.5);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(10, 25, 47);
+          pdf.text(`STEP ${i + 1}`, marginL + pillW / 2, y + 5.5, {
+            align: "center",
+          });
+
+          writeText(stepTitle, {
+            size: 11.5,
+            bold: true,
+            color: [10, 25, 47],
+            indent: contentIndent,
+            gap: 2,
+          });
+
+          if (stepDesc) {
+            writeText(stepDesc, {
+              size: 10,
+              color: [70, 70, 70],
+              indent: contentIndent,
+              gap: 4.5,
+            });
+          } else {
+            y += 2;
+          }
+
+          if (i < nextSteps.length - 1) {
+            drawHRule([235, 235, 235], 0.2);
+          }
+        });
+      }
+
+      drawSectionHeading("Emergency Contacts");
+      if (emergencyActions.length === 0) {
+        writeText("No emergency contacts available.", {
+          size: 9.5,
+          color: [120, 120, 120],
+          gap: 4,
+        });
+      } else {
+        const colW = (contentW - 4) / 2;
+        const startX = marginL;
+        let colIdx = 0;
+        let rowStartY = y;
+        let rowMaxHeight = 0;
+
+        emergencyActions.forEach((item, i) => {
+          const xPos = startX + (colIdx === 0 ? 0 : colW + 4);
+          const nameLines = pdf.splitTextToSize(sanitizePdfText(item.name), colW - 6);
+          const cardH = Math.max(16, nameLines.length * 3.8 + 9.5);
+
+          if (colIdx === 0) {
+            rowStartY = y;
+            ensureSpace(cardH + 2);
+            rowMaxHeight = cardH;
+          } else {
+            rowMaxHeight = Math.max(rowMaxHeight, cardH);
+          }
+
+          pdf.setFillColor(254, 242, 242);
+          pdf.setDrawColor(254, 202, 202);
+          pdf.setLineWidth(0.25);
+          pdf.roundedRect(xPos, rowStartY, colW, cardH, 2, 2, "FD");
+
+          pdf.setFontSize(8);
+          setSmartFont("bold", item.name);
+          pdf.setTextColor(153, 27, 27);
+          pdf.text(nameLines, xPos + 3, rowStartY + 5.5);
+
+          pdf.setFontSize(12);
+          pdf.setFont("helvetica", "bold");
+          pdf.setTextColor(185, 28, 28);
+          pdf.text(sanitizePdfText(item.number), xPos + 3, rowStartY + cardH - 3.5);
+
+          colIdx++;
+          if (colIdx === 2 || i === emergencyActions.length - 1) {
+            y = rowStartY + rowMaxHeight + 3;
+            colIdx = 0;
+          }
+        });
+      }
+
+      drawSectionHeading("Nearby Legal Aid Centers");
+      if (centers.length === 0) {
+        writeText("No legal aid centers found.", {
+          size: 9.5,
+          color: [120, 120, 120],
+          gap: 4,
+        });
+      } else {
+        centers.forEach((center, i) => {
+          const titleBase = `${i + 1}. ${center.name}`;
+          const distanceSuffix =
+            typeof center.distance === "number"
+              ? ` - ${center.distance.toFixed(2)} km away`
+              : "";
+          const fullTitle = sanitizePdfText(`${titleBase}${distanceSuffix}`);
+          const titleLines = pdf.splitTextToSize(fullTitle, contentW - 8);
+          const addrLines = pdf.splitTextToSize(
+            sanitizePdfText(center.address || "Address not available"),
+            contentW - 8,
+          );
+          const cardH = titleLines.length * 4.2 + addrLines.length * 3.8 + 11;
+
+          ensureSpace(cardH + 2);
+          pdf.setFillColor(248, 250, 252);
+          pdf.setDrawColor(210, 218, 230);
+          pdf.setLineWidth(0.25);
+          pdf.roundedRect(marginL, y, contentW, cardH, 2, 2, "FD");
+          pdf.setFillColor(10, 25, 47);
+          pdf.rect(marginL, y, 2.5, cardH, "F");
+
+          pdf.setFontSize(10.5);
+          setSmartFont("bold", fullTitle);
+          pdf.setTextColor(10, 25, 47);
+          pdf.text(titleLines, marginL + 6, y + 5.5);
+
+          let cardY = y + 5.5 + titleLines.length * 4.2;
+          pdf.setFontSize(9);
+          setSmartFont("normal", center.address || "Address not available");
+          pdf.setTextColor(80, 80, 80);
+          pdf.text(addrLines, marginL + 6, cardY);
+          cardY += addrLines.length * 3.8 + 1;
+
+          if (center.phone) {
+            const phoneLabel = `Phone: ${center.phone}`;
+            pdf.setFontSize(9);
+            setSmartFont("bold", phoneLabel);
+            pdf.setTextColor(10, 100, 180);
+            pdf.text(sanitizePdfText(phoneLabel), marginL + 6, cardY);
+          }
+
+          y += cardH + 3;
+        });
+      }
+
+      ensureSpace(18);
+      y += 2;
+      pdf.setFillColor(245, 245, 245);
+      pdf.rect(marginL, y, contentW, 16, "F");
+      pdf.setFontSize(7.5);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(100, 100, 100);
+      pdf.text("LEGAL NOTICE", marginL + 4, y + 5);
+      pdf.setFontSize(7.5);
+      const disclaimer =
+        "This document is AI-generated simplified guidance and does not constitute formal legal counsel. Always consult a certified legal professional. Brought to you by NyayMitra.";
+      setSmartFont("normal", disclaimer);
+      pdf.setTextColor(120, 120, 120);
+      const dLines = pdf.splitTextToSize(sanitizePdfText(disclaimer), contentW - 8);
+      pdf.text(dLines, marginL + 4, y + 9);
+
+      const internalApi = pdf.internal as unknown as { getNumberOfPages: () => number };
+      const totalPages = internalApi.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p);
+        const footerY = pageHeight - 6;
+        pdf.setDrawColor(200, 200, 200);
+        pdf.setLineWidth(0.2);
+        pdf.line(marginL, footerY - 2, pageWidth - marginR, footerY - 2);
+        pdf.setFontSize(7);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(160, 160, 160);
+        pdf.text("NyayMitra - Confidential Legal Guidance", marginL, footerY);
+        pdf.text(`Page ${p} of ${totalPages}`, pageWidth - marginR, footerY, {
+          align: "right",
+        });
+      }
+
+      const safeDate = (dateStr || new Date().toLocaleDateString()).replace(
+        /[\/\s]/g,
+        "_",
+      );
+      pdf.save(`NyayMitra_Report_${safeDate}.pdf`);
+      setPdfStatusMessage(
+        PDF_SUCCESS_LABELS[selectedLanguage] || "Report downloaded successfully.",
+      );
+    } catch (err) {
+      console.error("PDF Generation failed", err);
+      setPdfStatusMessage(
+        PDF_FAILED_LABELS[selectedLanguage] ||
+          "Could not download report. Please try again.",
+      );
+    } finally {
+      setIsGeneratingPDF(false);
+      setTimeout(() => setPdfStatusMessage(null), 3500);
+    }
   };
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
@@ -808,12 +1322,19 @@ export default function ResultsPage() {
           <div className="pt-4">
             <button
               onClick={generatePDF}
-              className="bg-[var(--color-deep-blue)] hover:bg-blue-900 text-white font-bold py-2.5 px-6 rounded-full shadow-md hover:scale-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 mx-auto"
+              disabled={isGeneratingPDF}
+              className="bg-[var(--color-deep-blue)] hover:bg-blue-900 disabled:bg-gray-400 text-white font-bold py-2.5 px-6 rounded-full shadow-md hover:scale-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 mx-auto"
             >
               <Download className="w-4 h-4" />{" "}
-              {PDF_BTN_LABELS[selectedLanguage] ||
-                "Download Legal Report (PDF)"}
+              {isGeneratingPDF
+                ? PDF_PROGRESS_LABELS[selectedLanguage] || "Downloading report..."
+                : PDF_BTN_LABELS[selectedLanguage] || "Download Legal Report (PDF)"}
             </button>
+            {pdfStatusMessage && (
+              <p className="mt-2 text-xs text-gray-600 dark:text-gray-300 font-medium text-center">
+                {pdfStatusMessage}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1221,6 +1742,79 @@ export default function ResultsPage() {
           </span>
         </div>
       )}
+      {/* HIDDEN INVISIBLE PDF TEMPLATE */}
+      <div className="fixed -left-[9999px] top-0 pointer-events-none z-[-1]">
+        <div
+          id="pdf-export-canvas"
+          className="bg-white text-black font-sans box-border relative flex flex-col"
+          style={{ width: "210mm", minHeight: "297mm" }}
+        >
+          {/* Header Bar */}
+          <div className="w-full bg-[#0a192f] p-8 text-white">
+            <h1 className="text-4xl font-extrabold uppercase tracking-widest text-[#f0a500]">
+              NyayMitra
+            </h1>
+            <p className="text-xl font-bold uppercase mt-2">Official Legal Guidance Report</p>
+          </div>
+
+          <div className="p-10 flex-1 flex flex-col">
+            {/* Metadata Seal */}
+            <div className="flex justify-between items-start border-b-2 border-gray-300 pb-6 mb-8">
+              <div className="space-y-2 text-sm">
+                <p><span className="font-bold text-gray-500 uppercase">Generated For:</span> <span className="font-semibold text-lg">{user?.displayName || "Anonymous User"}</span></p>
+                <p><span className="font-bold text-gray-500 uppercase">Date Issued:</span> {dateStr}</p>
+                <p><span className="font-bold text-gray-500 uppercase">Contact ID:</span> {user?.email ? user.email : "N/A"}</p>
+              </div>
+              <div className="text-right">
+                <div className="border border-red-500 text-red-600 px-4 py-2 font-black uppercase text-xl inline-block tracking-widest transform rotate-3">
+                  Urgency: {urgency}
+                </div>
+                <p className="mt-4 font-bold text-gray-800 text-lg uppercase bg-gray-100 px-3 py-1 rounded inline-block">{getCategoryLabel(category)}</p>
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div>
+              <h2 className="text-2xl font-black uppercase tracking-widest text-[#0a192f] mb-4 border-b border-gray-200 pb-2">Your Verified Rights</h2>
+              <div className="grid grid-cols-2 gap-6 mb-10">
+                {rights.map((right, i) => (
+                  <div key={i} className="bg-gray-50 p-5 rounded-lg border border-gray-200 shadow-sm relative">
+                    <div className="absolute top-0 left-0 w-2 h-full bg-[#f0a500] rounded-l-lg"></div>
+                    <h3 className="text-lg font-bold text-[#0a192f] mb-2">{right.title}</h3>
+                    <p className="text-gray-700 text-sm leading-relaxed">{right.desc}</p>
+                    {citations[i] && (
+                      <div className="mt-3 bg-white p-3 rounded border border-gray-200 text-xs text-gray-500 font-semibold italic">
+                        {citations[i].law_name} {typeof citations[i].page === "number" ? `(Page ${citations[i].page})` : ""}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <h2 className="text-2xl font-black uppercase tracking-widest text-[#0a192f] mb-4 border-b border-gray-200 pb-2">Recommended Course of Action</h2>
+              <div className="space-y-6 flex-1">
+                {nextSteps.map((step, i) => (
+                  <div key={i} className="flex gap-4 items-start">
+                    <div className="bg-[#0a192f] text-white w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0 mt-1">
+                      {i + 1}
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-bold text-gray-900">{step.title}</h4>
+                      <p className="text-gray-700 mt-1 pb-4 border-b border-gray-100">{step.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer Footer */}
+          <div className="bg-gray-100 p-6 text-center text-xs text-gray-500 font-semibold border-t border-gray-200">
+            This document is AI-generated simplified guidance and does not constitute formal legal counsel. <br/>
+            Always consult a certified legal professional. Brought to you by NyayMitra.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
