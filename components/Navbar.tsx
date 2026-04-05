@@ -42,6 +42,16 @@ export default function Navbar() {
           </div>
           
           <div className="flex items-center gap-3 md:gap-5">
+            
+            {/* Contact Information */}
+            <div className="hidden lg:block text-right mr-1 border-r border-gray-200 dark:border-zinc-700 pr-5 print:hidden">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-0.5">Contact Us</div>
+              <div className="text-xs font-semibold text-[var(--color-deep-blue)] dark:text-blue-300 flex items-center gap-1.5">
+                <a href="tel:18001112222" className="hover:underline transition-all">1800-111-2222</a>
+                <span className="opacity-40">•</span>
+                <a href="mailto:admin@example.com" className="hover:underline transition-all">admin@example.com</a>
+              </div>
+            </div>
             <button
               onClick={toggleTheme}
               className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
