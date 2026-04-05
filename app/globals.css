@@ -27,3 +27,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  html, body {
+    background: white !important;
+    color: black !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+  
+  /* Reset Any Layout Containment to allow native pagination */
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  
+  /* Strip out scrollbars and height bounds built for web */
+  div, main, section {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  nav, header, footer, .navbar-container {
+    display: none !important;
+  }
+
+  .dark {
+    background: white !important;
+    color: black !important;
+  }
+}

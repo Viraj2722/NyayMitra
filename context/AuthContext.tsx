@@ -140,6 +140,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const logout = async () => {
     try {
       await signOut(auth);
+      // Clear all local state to reset the app flow (Safety prompt, Chat Session, Results)
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("nyaymitra_safety_status");
+        sessionStorage.removeItem("nyaymitra_chat_session");
+        
+        // Loop through localStorage to remove all cached nyaymitra keys
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("nyaymitra_")) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        
+        // Globally redirect to landing page
+        window.location.href = "/";
+      }
     } catch (error) {
       console.error("Error signing out", error);
     }
