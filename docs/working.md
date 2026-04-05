@@ -93,7 +93,7 @@ POST /api/query/ processing pipeline:
 7. Detect urgency.
 8. Resolve legal category (intake category has priority over AI fallback).
 9. Fetch nearest/relevant centers using category + coordinates.
-10. Persist live query to Firestore (live_queries collection).
+10. Persist live query to Data Connect (live_queries collection).
 11. Return structured response to frontend.
 
 Other endpoints:

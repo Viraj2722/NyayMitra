@@ -4,27 +4,32 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { Shield, ShieldAlert, LogOut, User as UserIcon, Moon, Sun } from "lucide-react";
+import { LogOut, User as UserIcon, Moon, Sun } from "lucide-react";
 
 export default function Navbar() {
   const { user, isAdmin, logout } = useAuth();
   const { t } = useLanguage();
-  const [anonymousMode, setAnonymousMode] = useState(false);
   // Keep initial render deterministic to avoid hydration mismatch.
-  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [theme, setTheme] = useState<"light" | "dark" | "unset">("unset");
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-      document.documentElement.classList.add("dark");
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    if (theme === "light") {
+    // Detect system preference and set accordingly
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (isDark) {
       setTheme("dark");
       document.documentElement.classList.add("dark");
     } else {
       setTheme("light");
+      document.documentElement.classList.remove("dark");
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    if (newTheme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
       document.documentElement.classList.remove("dark");
     }
   };
@@ -57,27 +62,12 @@ export default function Navbar() {
               className="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
               title={t("nav.toggleTheme", "Toggle Dark Mode")}
             >
-              {theme === "light" ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-            </button>
-
-            <button
-              onClick={() => setAnonymousMode(!anonymousMode)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs md:text-sm font-semibold transition-all ${
-                anonymousMode
-                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 ring-2 ring-green-500/20"
-                  : "bg-gray-100 text-gray-600 dark:bg-zinc-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-700"
-              }`}
-            >
-              {anonymousMode ? (
-                <>
-                  <Shield className="w-4 h-4" />
-                  {t("nav.protected", "Protected")}
-                </>
+              {theme === "unset" ? (
+                <Sun className="w-5 h-5" />
+              ) : theme === "light" ? (
+                <Moon className="w-5 h-5" />
               ) : (
-                <>
-                  <ShieldAlert className="w-4 h-4" />
-                  {t("nav.anonymousOff", "Anonymous: OFF")}
-                </>
+                <Sun className="w-5 h-5" />
               )}
             </button>
 
