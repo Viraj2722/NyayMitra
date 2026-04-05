@@ -1,5 +1,7 @@
 # NyayMitra Working Guide
 
+Last updated: 2026-04-05
+
 This document explains how the application works end-to-end: user flow, frontend/backend interaction, AI processing, and data storage.
 
 ## 1. What the app does
@@ -14,6 +16,7 @@ Main capabilities:
 - Legal aid center matching
 - Appointment booking and status tracking
 - Admin-facing operational visibility
+- Citation-aware legal guidance via local RAG context
 
 ## 2. High-level architecture
 
@@ -21,7 +24,7 @@ Main capabilities:
 - Backend API: Flask app in backend/
 - AI + language pipeline: backend/services/
 - Persistence:
-- Firebase Data Connect (client-side user/query profile integrations)
+- Firebase Data Connect (client-side user/query profile and query metadata)
 - Firestore (live queries, centers, appointments)
 
 Runtime split:
@@ -85,11 +88,13 @@ POST /api/query/ processing pipeline:
 2. Detect language.
 3. Translate input to English for AI processing.
 4. Generate analytical AI response (rights, steps, category, emergency metadata).
-5. Detect urgency.
-6. Resolve legal category (intake category has priority over AI fallback).
-7. Fetch nearest/relevant centers using category + coordinates.
-8. Persist live query to Firestore (live_queries collection).
-9. Return structured response to frontend.
+5. Retrieve legal context from local RAG index inside ai_service/legal_rag_service.
+6. Build citation-backed output from retrieved context and model result.
+7. Detect urgency.
+8. Resolve legal category (intake category has priority over AI fallback).
+9. Fetch nearest/relevant centers using category + coordinates.
+10. Persist live query to Firestore (live_queries collection).
+11. Return structured response to frontend.
 
 Other endpoints:
 
@@ -117,6 +122,7 @@ Core services in backend/services/:
 - ai_service.py: structured legal guidance generation
 - translation_service.py: language detection and translation helpers
 - matching_service.py: legal-aid center ranking/matching
+- legal_rag_service.py: local corpus ingestion, indexing, and retrieval
 
 Utility:
 
@@ -125,7 +131,7 @@ Utility:
 ## 6. Data flow summary
 
 1. User submits issue from chat UI.
-2. Backend analyzes and enriches query.
+2. Backend analyzes and enriches query with local legal context.
 3. Backend stores query event in Firestore.
 4. Frontend renders:
 
@@ -133,6 +139,7 @@ Utility:
 - suggested next steps
 - urgency state
 - center recommendations
+- citations for legal traceability
 
 5. User books appointment.
 6. Appointment is stored in Firestore and shown in user dashboard.
@@ -184,6 +191,7 @@ Expected:
 - Missing or invalid env keys for Firebase, Gemini, or Maps.
 - Backend running without valid Firebase Admin credentials (Firestore reads/writes fail or fallback behavior appears).
 - Frontend env changes not reflected until Next.js dev server restart.
+- RAG index missing in backend/legal_knowledge_base/ causing weak or empty citations.
 
 ## 10. File map for core logic
 
@@ -200,6 +208,7 @@ Expected:
 - Center routes: backend/routes/center_routes.py
 - Appointment routes: backend/routes/appointment_routes.py
 - AI service: backend/services/ai_service.py
+- RAG service: backend/services/legal_rag_service.py
 - Translation service: backend/services/translation_service.py
 - Matching service: backend/services/matching_service.py
 - Urgency utility: backend/utils/urgency_detector.py

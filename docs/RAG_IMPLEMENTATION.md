@@ -1,22 +1,29 @@
 # NyayMitra RAG Implementation Guide
 
-This document explains how Retrieval-Augmented Generation (RAG) is implemented in NyayMitra and how citation-backed rights are shown to users.
+Last updated: 2026-04-05
 
-## 1. Current Mode
+This document describes the currently active RAG flow in NyayMitra.
 
-Current runtime mode is local chunking retrieval.
+## 1. Current Runtime Architecture
 
-- Chunk source: local JSON index at backend/legal_knowledge_base/legal_rag_index.json
-- Retriever: backend/services/legal_rag_service.py
-- Answer generator: backend/services/ai_service.py
-- API response includes citations[] and is returned by backend/routes/query_routes.py
-- UI source cards render in app/results/page.tsx
+NyayMitra currently uses local-file RAG retrieval at runtime.
 
-Data Connect chunk schema and sync utilities may still exist in the repo, but runtime retrieval currently uses local index retrieval.
+- Retriever module: backend/services/legal_rag_service.py
+- AI orchestration: backend/services/ai_service.py
+- Query API route: backend/routes/query_routes.py
+- Ingestion entrypoint: backend/ingest_legal_data.py
+- Local index path: backend/legal_knowledge_base/legal_rag_index.json
+- Manifest cache: backend/legal_knowledge_base/legal_rag_manifest.json
 
-## 2. Legal Corpus
+Notes:
 
-Ingestion pulls official law PDFs:
+- Runtime retrieval is not using Firestore vectors or external vector DB.
+- Citations are returned from the backend as citations in the query response.
+- Results UI reads citations from localStorage key nyaymitra_citations.
+
+## 2. Active Legal Corpus
+
+The currently configured law sources are defined in LATEST_INDIAN_LAWS in backend/services/legal_rag_service.py:
 
 - Constitution_of_India
 - BNS_2023
@@ -24,94 +31,90 @@ Ingestion pulls official law PDFs:
 - BSA_2023
 - Contract_Act_1872
 
-Source list is defined in backend/services/legal_rag_service.py under LATEST_INDIAN_LAWS.
+## 3. Ingestion and Index Build
 
-## 3. Ingestion and Chunking
+Run from backend folder:
 
-Run from project root:
+1. python ingest_legal_data.py
 
-1. cd backend
-2. python ingest_legal_data.py
+Ingestion behavior:
 
-What happens:
+- Downloads PDFs into backend/legal_knowledge_base/
+- Splits text with RecursiveCharacterTextSplitter
+- Builds deterministic local embeddings (hash-based)
+- Writes index to legal_rag_index.json
+- Writes source-state cache to legal_rag_manifest.json
 
-- PDFs are downloaded to backend/legal_knowledge_base/
-- Text is split using RecursiveCharacterTextSplitter
-- Chunks are embedded using lightweight deterministic hashing
-- Index is saved to backend/legal_knowledge_base/legal_rag_index.json
-- Manifest cache is saved to backend/legal_knowledge_base/legal_rag_manifest.json
+When source-state has not changed, re-runs reuse cache and skip full rebuild.
 
-## 4. Retrieval Flow
+## 4. Retrieval and Prompting Flow
 
 At query time:
 
-1. Chat sends user issue to POST /api/query/
-2. AI service calls retrieve_legal_context(...)
-3. Retriever ranks chunks by hybrid score:
-   - cosine-like score from local embedding vectors
+1. POST /api/query/ receives user text, language, and intake context.
+2. backend/services/ai_service.py calls retrieve_legal_context(...).
+3. Retriever scores chunks with a hybrid score:
+   - embedding cosine score
    - token overlap score
-4. Top chunks are turned into citations with:
-   - law_name
-   - page
-   - source_url
-   - excerpt
+4. Top legal snippets are inserted into Gemini prompt context.
+5. Gemini returns structured JSON (response, category, rights, next_steps, emergency_numbers, map_search_query, citations).
 
-If citations are weak or absent for the query/category, citations can be empty.
+## 5. Citation Flow to Frontend
 
-## 5. Citation to UI Flow
+1. Backend returns citations in /api/query/ response.
+2. Chat page stores citations in localStorage (nyaymitra_citations).
+3. Results page reads nyaymitra_citations and maps citations to rights cards.
+4. If a right has no citation, fallback text is shown.
 
-1. Backend returns citations in /api/query/ response JSON
-2. Chat stores citations in localStorage key nyaymitra_citations
-3. Results page reads nyaymitra_citations
-4. Rights cards display source panel per card
-
-If citation is missing for a right card, the fallback text is shown:
+Current fallback text on rights card:
 
 No verified source found for this right yet.
 
-## 6. Verification Status in Data Connect
+## 6. Data Connect Verification Metadata
 
-Query-level verification metadata is persisted in Data Connect UserQuery fields:
+The chat client writes verification metadata to Data Connect when creating UserQuery records:
 
 - ragVerificationStatus
 - ragConfidence
 - ragCitationsJson
 
-This is for auditing/query history and does not control runtime retrieval mode currently.
+These fields are audit metadata and do not drive runtime retrieval.
 
-## 7. Troubleshooting
+## 7. Known Operational Constraints
 
-### A. Ingestion is slow
+- Some government PDF URLs can intermittently fail due to host availability or certificate issues.
+- The local RAG pipeline is optimized for reliability and determinism over semantic-embedding precision.
+- Deprecated google.generativeai warnings may appear in scripts/services that still use that SDK path.
 
-- First run is expected to take time
-- Re-run uses manifest cache when source PDFs are unchanged
+## 8. Troubleshooting
 
-### B. PDF parse warnings
+### A. citations is empty in /api/query/ response
 
-The downloader validates PDF header and re-downloads invalid files.
+Check:
 
-### C. citations[] empty in API response
+1. backend/legal_knowledge_base/legal_rag_index.json exists and is non-empty
+2. Intake category mapping allows relevant laws (backend/services/ai_service.py)
+3. Retriever thresholds in backend/services/legal_rag_service.py are not filtering everything
 
-Check in order:
+### B. Ingestion produced zero chunks
 
-1. Index exists: backend/legal_knowledge_base/legal_rag_index.json
-2. Query category is not overly restrictive in backend/services/ai_service.py ALLOWED_LAWS_BY_CATEGORY
-3. Retriever threshold allows enough matches in backend/services/legal_rag_service.py
-4. Test endpoint directly:
-   - POST http://127.0.0.1:5000/api/query/
-   - inspect citations[]
+Check:
 
-### D. Results page shows fallback source text
+1. PDF downloads succeeded
+2. Files are valid PDFs in backend/legal_knowledge_base/
+3. Re-run with force-download logic if stale/invalid files are present
 
-This means citations[] was empty or shorter than rights[] for that response.
+### C. Results page shows fallback citation text
 
-## 8. Quick Test Commands
+This means citations array is empty or shorter than rights array for that response.
+
+## 9. Quick Test Commands
 
 Backend health:
 
 Invoke-WebRequest http://127.0.0.1:5000/health | Select-Object -ExpandProperty Content
 
-RAG query test:
+Query test:
 
 $body = @{
 text = "My landlord is forcing me to vacate without notice"
@@ -125,7 +128,7 @@ followUpAnswer = "No written notice"
 
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5000/api/query/ -ContentType "application/json" -Body $body | ConvertTo-Json -Depth 8
 
-## 9. Files You Will Usually Edit
+## 10. Core Files
 
 - backend/services/legal_rag_service.py
 - backend/services/ai_service.py
