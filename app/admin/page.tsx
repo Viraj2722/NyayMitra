@@ -134,20 +134,19 @@ export default function AdminPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save center");
+        let errorMessage = "Failed to save center";
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // ignore parsing error
+        }
+        throw new Error(errorMessage);
       }
 
       const created = await response.json();
-      setCenters((current) => [
-        {
-          id: created.id || `${Date.now()}`,
-          name: centerName,
-          address: centerAddress,
-          phone: centerPhone,
-          categories: centerCategories.split(",").map((value) => value.trim()).filter(Boolean),
-        },
-        ...current,
-      ]);
       setCenterMessage("Center saved to the database.");
       setCenterName("");
       setCenterPhone("");
@@ -159,8 +158,12 @@ export default function AdminPage() {
       setCenterTimings("Mon-Sat 10AM-5PM");
       setCenterEmergency(true);
       setCenterPriority(10);
-    } catch {
-      setCenterMessage("Unable to save the center right now.");
+    } catch (err) {
+      if (err instanceof Error) {
+        setCenterMessage(err.message);
+      } else {
+        setCenterMessage("Unable to save the center right now.");
+      }
     } finally {
       setSavingCenter(false);
     }

@@ -47,6 +47,15 @@ def create_center():
             languages = [languages]
 
         db = firestore.client()
+        name_query = payload.get("name").strip()
+        phone_query = payload.get("phone").strip()
+
+        # Check for existing duplicate center
+        existing_docs = list(db.collection("centers").where("name", "==", name_query).where("phone", "==", phone_query).limit(1).stream())
+        if existing_docs:
+            return jsonify({"error": f"A center named '{name_query}' with this phone number already exists in the database."}), 409
+
+        db = firestore.client()
         doc_ref = db.collection("centers").add({
             "name": payload.get("name"),
             "address": payload.get("address"),
@@ -70,6 +79,6 @@ def create_center():
             "created_at": datetime.datetime.utcnow(),
         })
 
-        return jsonify({"message": "Center created successfully", "id": doc_ref[0].id}), 201
+        return jsonify({"message": "Center created successfully", "id": doc_ref[1].id}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
