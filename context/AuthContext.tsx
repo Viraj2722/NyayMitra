@@ -93,7 +93,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setIsAdmin(result.user.email === ADMIN_EMAIL);
       }
     } catch (error) {
+      // Silently ignore cancelled popup requests (user-initiated cancellations)
+      const errorCode = (error as any)?.code || "";
+      if (errorCode === "auth/cancelled-popup-request") {
+        console.debug("User cancelled the authentication popup");
+        return;
+      }
       console.error("Error signing in with Google", error);
+      throw error;
     }
   };
 
