@@ -47,6 +47,7 @@ def _serialize_query(doc):
         "isUrgent": data.get("isUrgent", False),
         "isAnonymous": data.get("isAnonymous", False),
         "aiResponse": data.get("aiResponse"),
+        "citations": data.get("citations", []),
         "translated_keywords": data.get("translated_keywords"),
         "language": data.get("detectedLanguage") or data.get("selectedResponseLanguage"),
         "category": data.get("legalCategoryDetected"),
@@ -127,6 +128,7 @@ def handle_query():
     next_steps = ai_json.get("next_steps", [])
     emergency_numbers = ai_json.get("emergency_numbers", [])
     map_search_query = ai_json.get("map_search_query", "Nearest Legal Aid Clinic")
+    citations = ai_json.get("citations", [])
 
     if not ai_response:
         ai_response = _localized_response_template(selected_language, category)
@@ -151,6 +153,7 @@ def handle_query():
             "isUrgent": urgent,
             "isAnonymous": is_anonymous,
             "aiResponse": ai_response,
+            "citations": citations,
             "translated_keywords": translated,
             "source": "live",
             "created_at": datetime.datetime.utcnow(),
@@ -168,6 +171,7 @@ def handle_query():
         "next_steps": next_steps,
         "emergency_numbers": emergency_numbers,
         "map_search_query": map_search_query,
+        "citations": citations,
         "detected_language": lang,
         "selected_language": selected_language,
         "intake_context": intake_context

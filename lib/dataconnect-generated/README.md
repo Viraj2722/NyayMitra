@@ -11,6 +11,9 @@ This README will guide you through the process of using the generated JavaScript
   - [*Connecting to the local Emulator*](#connecting-to-the-local-emulator)
 - [**Queries**](#queries)
   - [*GetUserByUid*](#getuserbyuid)
+  - [*SearchLegalChunks*](#searchlegalchunks)
+  - [*SearchLegalChunksByLaw*](#searchlegalchunksbylaw)
+  - [*ListLegalChunksByLaw*](#listlegalchunksbylaw)
 - [**Mutations**](#mutations)
   - [*CreateUser*](#createuser)
   - [*UpsertUserProfile*](#upsertuserprofile)
@@ -18,6 +21,7 @@ This README will guide you through the process of using the generated JavaScript
   - [*CreateUserQuery*](#createuserquery)
   - [*CreateAppointment*](#createappointment)
   - [*CreateAppointmentWithCenter*](#createappointmentwithcenter)
+  - [*CreateLegalChunk*](#createlegalchunk)
 
 # Accessing the connector
 A connector is a collection of Queries and Mutations. One SDK is generated for each connector - this SDK is generated for the connector `example`. You can find more information about connectors in the [Data Connect documentation](https://firebase.google.com/docs/data-connect#how-does).
@@ -176,6 +180,378 @@ console.log(data.users);
 executeQuery(ref).then((response) => {
   const data = response.data;
   console.log(data.users);
+});
+```
+
+## SearchLegalChunks
+You can execute the `SearchLegalChunks` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+searchLegalChunks(vars: SearchLegalChunksVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksData, SearchLegalChunksVariables>;
+
+interface SearchLegalChunksRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: SearchLegalChunksVariables): QueryRef<SearchLegalChunksData, SearchLegalChunksVariables>;
+}
+export const searchLegalChunksRef: SearchLegalChunksRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+searchLegalChunks(dc: DataConnect, vars: SearchLegalChunksVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksData, SearchLegalChunksVariables>;
+
+interface SearchLegalChunksRef {
+  ...
+  (dc: DataConnect, vars: SearchLegalChunksVariables): QueryRef<SearchLegalChunksData, SearchLegalChunksVariables>;
+}
+export const searchLegalChunksRef: SearchLegalChunksRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the searchLegalChunksRef:
+```typescript
+const name = searchLegalChunksRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `SearchLegalChunks` query requires an argument of type `SearchLegalChunksVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface SearchLegalChunksVariables {
+  term: string;
+  limit: number;
+}
+```
+### Return Type
+Recall that executing the `SearchLegalChunks` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `SearchLegalChunksData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface SearchLegalChunksData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+```
+### Using `SearchLegalChunks`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, searchLegalChunks, SearchLegalChunksVariables } from '@dataconnect/my-app';
+
+// The `SearchLegalChunks` query requires an argument of type `SearchLegalChunksVariables`:
+const searchLegalChunksVars: SearchLegalChunksVariables = {
+  term: ..., 
+  limit: ..., 
+};
+
+// Call the `searchLegalChunks()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await searchLegalChunks(searchLegalChunksVars);
+// Variables can be defined inline as well.
+const { data } = await searchLegalChunks({ term: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await searchLegalChunks(dataConnect, searchLegalChunksVars);
+
+console.log(data.legalChunks);
+
+// Or, you can use the `Promise` API.
+searchLegalChunks(searchLegalChunksVars).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunks);
+});
+```
+
+### Using `SearchLegalChunks`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, searchLegalChunksRef, SearchLegalChunksVariables } from '@dataconnect/my-app';
+
+// The `SearchLegalChunks` query requires an argument of type `SearchLegalChunksVariables`:
+const searchLegalChunksVars: SearchLegalChunksVariables = {
+  term: ..., 
+  limit: ..., 
+};
+
+// Call the `searchLegalChunksRef()` function to get a reference to the query.
+const ref = searchLegalChunksRef(searchLegalChunksVars);
+// Variables can be defined inline as well.
+const ref = searchLegalChunksRef({ term: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = searchLegalChunksRef(dataConnect, searchLegalChunksVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.legalChunks);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunks);
+});
+```
+
+## SearchLegalChunksByLaw
+You can execute the `SearchLegalChunksByLaw` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+searchLegalChunksByLaw(vars: SearchLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+
+interface SearchLegalChunksByLawRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: SearchLegalChunksByLawVariables): QueryRef<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+}
+export const searchLegalChunksByLawRef: SearchLegalChunksByLawRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+searchLegalChunksByLaw(dc: DataConnect, vars: SearchLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+
+interface SearchLegalChunksByLawRef {
+  ...
+  (dc: DataConnect, vars: SearchLegalChunksByLawVariables): QueryRef<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+}
+export const searchLegalChunksByLawRef: SearchLegalChunksByLawRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the searchLegalChunksByLawRef:
+```typescript
+const name = searchLegalChunksByLawRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `SearchLegalChunksByLaw` query requires an argument of type `SearchLegalChunksByLawVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface SearchLegalChunksByLawVariables {
+  lawName: string;
+  term: string;
+  limit: number;
+}
+```
+### Return Type
+Recall that executing the `SearchLegalChunksByLaw` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `SearchLegalChunksByLawData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface SearchLegalChunksByLawData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+```
+### Using `SearchLegalChunksByLaw`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, searchLegalChunksByLaw, SearchLegalChunksByLawVariables } from '@dataconnect/my-app';
+
+// The `SearchLegalChunksByLaw` query requires an argument of type `SearchLegalChunksByLawVariables`:
+const searchLegalChunksByLawVars: SearchLegalChunksByLawVariables = {
+  lawName: ..., 
+  term: ..., 
+  limit: ..., 
+};
+
+// Call the `searchLegalChunksByLaw()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await searchLegalChunksByLaw(searchLegalChunksByLawVars);
+// Variables can be defined inline as well.
+const { data } = await searchLegalChunksByLaw({ lawName: ..., term: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await searchLegalChunksByLaw(dataConnect, searchLegalChunksByLawVars);
+
+console.log(data.legalChunks);
+
+// Or, you can use the `Promise` API.
+searchLegalChunksByLaw(searchLegalChunksByLawVars).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunks);
+});
+```
+
+### Using `SearchLegalChunksByLaw`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, searchLegalChunksByLawRef, SearchLegalChunksByLawVariables } from '@dataconnect/my-app';
+
+// The `SearchLegalChunksByLaw` query requires an argument of type `SearchLegalChunksByLawVariables`:
+const searchLegalChunksByLawVars: SearchLegalChunksByLawVariables = {
+  lawName: ..., 
+  term: ..., 
+  limit: ..., 
+};
+
+// Call the `searchLegalChunksByLawRef()` function to get a reference to the query.
+const ref = searchLegalChunksByLawRef(searchLegalChunksByLawVars);
+// Variables can be defined inline as well.
+const ref = searchLegalChunksByLawRef({ lawName: ..., term: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = searchLegalChunksByLawRef(dataConnect, searchLegalChunksByLawVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.legalChunks);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunks);
+});
+```
+
+## ListLegalChunksByLaw
+You can execute the `ListLegalChunksByLaw` query using the following action shortcut function, or by calling `executeQuery()` after calling the following `QueryRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+listLegalChunksByLaw(vars: ListLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+
+interface ListLegalChunksByLawRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ListLegalChunksByLawVariables): QueryRef<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+}
+export const listLegalChunksByLawRef: ListLegalChunksByLawRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `QueryRef` function.
+```typescript
+listLegalChunksByLaw(dc: DataConnect, vars: ListLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+
+interface ListLegalChunksByLawRef {
+  ...
+  (dc: DataConnect, vars: ListLegalChunksByLawVariables): QueryRef<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+}
+export const listLegalChunksByLawRef: ListLegalChunksByLawRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the listLegalChunksByLawRef:
+```typescript
+const name = listLegalChunksByLawRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `ListLegalChunksByLaw` query requires an argument of type `ListLegalChunksByLawVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface ListLegalChunksByLawVariables {
+  lawName: string;
+  limit: number;
+}
+```
+### Return Type
+Recall that executing the `ListLegalChunksByLaw` query returns a `QueryPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `ListLegalChunksByLawData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface ListLegalChunksByLawData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+```
+### Using `ListLegalChunksByLaw`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, listLegalChunksByLaw, ListLegalChunksByLawVariables } from '@dataconnect/my-app';
+
+// The `ListLegalChunksByLaw` query requires an argument of type `ListLegalChunksByLawVariables`:
+const listLegalChunksByLawVars: ListLegalChunksByLawVariables = {
+  lawName: ..., 
+  limit: ..., 
+};
+
+// Call the `listLegalChunksByLaw()` function to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await listLegalChunksByLaw(listLegalChunksByLawVars);
+// Variables can be defined inline as well.
+const { data } = await listLegalChunksByLaw({ lawName: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await listLegalChunksByLaw(dataConnect, listLegalChunksByLawVars);
+
+console.log(data.legalChunks);
+
+// Or, you can use the `Promise` API.
+listLegalChunksByLaw(listLegalChunksByLawVars).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunks);
+});
+```
+
+### Using `ListLegalChunksByLaw`'s `QueryRef` function
+
+```typescript
+import { getDataConnect, executeQuery } from 'firebase/data-connect';
+import { connectorConfig, listLegalChunksByLawRef, ListLegalChunksByLawVariables } from '@dataconnect/my-app';
+
+// The `ListLegalChunksByLaw` query requires an argument of type `ListLegalChunksByLawVariables`:
+const listLegalChunksByLawVars: ListLegalChunksByLawVariables = {
+  lawName: ..., 
+  limit: ..., 
+};
+
+// Call the `listLegalChunksByLawRef()` function to get a reference to the query.
+const ref = listLegalChunksByLawRef(listLegalChunksByLawVars);
+// Variables can be defined inline as well.
+const ref = listLegalChunksByLawRef({ lawName: ..., limit: ..., });
+
+// You can also pass in a `DataConnect` instance to the `QueryRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = listLegalChunksByLawRef(dataConnect, listLegalChunksByLawVars);
+
+// Call `executeQuery()` on the reference to execute the query.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeQuery(ref);
+
+console.log(data.legalChunks);
+
+// Or, you can use the `Promise` API.
+executeQuery(ref).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunks);
 });
 ```
 
@@ -610,6 +986,9 @@ export interface CreateUserQueryVariables {
   isUrgent: boolean;
   isAnonymous: boolean;
   aiResponse?: string | null;
+  ragVerificationStatus?: string | null;
+  ragConfidence?: number | null;
+  ragCitationsJson?: string | null;
 }
 ```
 ### Return Type
@@ -639,13 +1018,16 @@ const createUserQueryVars: CreateUserQueryVariables = {
   isUrgent: ..., 
   isAnonymous: ..., 
   aiResponse: ..., // optional
+  ragVerificationStatus: ..., // optional
+  ragConfidence: ..., // optional
+  ragCitationsJson: ..., // optional
 };
 
 // Call the `createUserQuery()` function to execute the mutation.
 // You can use the `await` keyword to wait for the promise to resolve.
 const { data } = await createUserQuery(createUserQueryVars);
 // Variables can be defined inline as well.
-const { data } = await createUserQuery({ userId: ..., queryText: ..., detectedLanguage: ..., selectedResponseLanguage: ..., legalCategoryDetected: ..., intakeFollowUpQuestion: ..., intakeFollowUpAnswer: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., });
+const { data } = await createUserQuery({ userId: ..., queryText: ..., detectedLanguage: ..., selectedResponseLanguage: ..., legalCategoryDetected: ..., intakeFollowUpQuestion: ..., intakeFollowUpAnswer: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., ragVerificationStatus: ..., ragConfidence: ..., ragCitationsJson: ..., });
 
 // You can also pass in a `DataConnect` instance to the action shortcut function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -678,12 +1060,15 @@ const createUserQueryVars: CreateUserQueryVariables = {
   isUrgent: ..., 
   isAnonymous: ..., 
   aiResponse: ..., // optional
+  ragVerificationStatus: ..., // optional
+  ragConfidence: ..., // optional
+  ragCitationsJson: ..., // optional
 };
 
 // Call the `createUserQueryRef()` function to get a reference to the mutation.
 const ref = createUserQueryRef(createUserQueryVars);
 // Variables can be defined inline as well.
-const ref = createUserQueryRef({ userId: ..., queryText: ..., detectedLanguage: ..., selectedResponseLanguage: ..., legalCategoryDetected: ..., intakeFollowUpQuestion: ..., intakeFollowUpAnswer: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., });
+const ref = createUserQueryRef({ userId: ..., queryText: ..., detectedLanguage: ..., selectedResponseLanguage: ..., legalCategoryDetected: ..., intakeFollowUpQuestion: ..., intakeFollowUpAnswer: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., ragVerificationStatus: ..., ragConfidence: ..., ragCitationsJson: ..., });
 
 // You can also pass in a `DataConnect` instance to the `MutationRef` function.
 const dataConnect = getDataConnect(connectorConfig);
@@ -950,6 +1335,136 @@ console.log(data.appointment_insert);
 executeMutation(ref).then((response) => {
   const data = response.data;
   console.log(data.appointment_insert);
+});
+```
+
+## CreateLegalChunk
+You can execute the `CreateLegalChunk` mutation using the following action shortcut function, or by calling `executeMutation()` after calling the following `MutationRef` function, both of which are defined in [dataconnect-generated/index.d.ts](./index.d.ts):
+```typescript
+createLegalChunk(vars: CreateLegalChunkVariables): MutationPromise<CreateLegalChunkData, CreateLegalChunkVariables>;
+
+interface CreateLegalChunkRef {
+  ...
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateLegalChunkVariables): MutationRef<CreateLegalChunkData, CreateLegalChunkVariables>;
+}
+export const createLegalChunkRef: CreateLegalChunkRef;
+```
+You can also pass in a `DataConnect` instance to the action shortcut function or `MutationRef` function.
+```typescript
+createLegalChunk(dc: DataConnect, vars: CreateLegalChunkVariables): MutationPromise<CreateLegalChunkData, CreateLegalChunkVariables>;
+
+interface CreateLegalChunkRef {
+  ...
+  (dc: DataConnect, vars: CreateLegalChunkVariables): MutationRef<CreateLegalChunkData, CreateLegalChunkVariables>;
+}
+export const createLegalChunkRef: CreateLegalChunkRef;
+```
+
+If you need the name of the operation without creating a ref, you can retrieve the operation name by calling the `operationName` property on the createLegalChunkRef:
+```typescript
+const name = createLegalChunkRef.operationName;
+console.log(name);
+```
+
+### Variables
+The `CreateLegalChunk` mutation requires an argument of type `CreateLegalChunkVariables`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+
+```typescript
+export interface CreateLegalChunkVariables {
+  lawName: string;
+  sourceUrl?: string | null;
+  sourceFile?: string | null;
+  page?: number | null;
+  chunkIndex: number;
+  text: string;
+  tokens: string[];
+  embeddingJson?: string | null;
+}
+```
+### Return Type
+Recall that executing the `CreateLegalChunk` mutation returns a `MutationPromise` that resolves to an object with a `data` property.
+
+The `data` property is an object of type `CreateLegalChunkData`, which is defined in [dataconnect-generated/index.d.ts](./index.d.ts). It has the following fields:
+```typescript
+export interface CreateLegalChunkData {
+  legalChunk_insert: LegalChunk_Key;
+}
+```
+### Using `CreateLegalChunk`'s action shortcut function
+
+```typescript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, createLegalChunk, CreateLegalChunkVariables } from '@dataconnect/my-app';
+
+// The `CreateLegalChunk` mutation requires an argument of type `CreateLegalChunkVariables`:
+const createLegalChunkVars: CreateLegalChunkVariables = {
+  lawName: ..., 
+  sourceUrl: ..., // optional
+  sourceFile: ..., // optional
+  page: ..., // optional
+  chunkIndex: ..., 
+  text: ..., 
+  tokens: ..., 
+  embeddingJson: ..., // optional
+};
+
+// Call the `createLegalChunk()` function to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await createLegalChunk(createLegalChunkVars);
+// Variables can be defined inline as well.
+const { data } = await createLegalChunk({ lawName: ..., sourceUrl: ..., sourceFile: ..., page: ..., chunkIndex: ..., text: ..., tokens: ..., embeddingJson: ..., });
+
+// You can also pass in a `DataConnect` instance to the action shortcut function.
+const dataConnect = getDataConnect(connectorConfig);
+const { data } = await createLegalChunk(dataConnect, createLegalChunkVars);
+
+console.log(data.legalChunk_insert);
+
+// Or, you can use the `Promise` API.
+createLegalChunk(createLegalChunkVars).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunk_insert);
+});
+```
+
+### Using `CreateLegalChunk`'s `MutationRef` function
+
+```typescript
+import { getDataConnect, executeMutation } from 'firebase/data-connect';
+import { connectorConfig, createLegalChunkRef, CreateLegalChunkVariables } from '@dataconnect/my-app';
+
+// The `CreateLegalChunk` mutation requires an argument of type `CreateLegalChunkVariables`:
+const createLegalChunkVars: CreateLegalChunkVariables = {
+  lawName: ..., 
+  sourceUrl: ..., // optional
+  sourceFile: ..., // optional
+  page: ..., // optional
+  chunkIndex: ..., 
+  text: ..., 
+  tokens: ..., 
+  embeddingJson: ..., // optional
+};
+
+// Call the `createLegalChunkRef()` function to get a reference to the mutation.
+const ref = createLegalChunkRef(createLegalChunkVars);
+// Variables can be defined inline as well.
+const ref = createLegalChunkRef({ lawName: ..., sourceUrl: ..., sourceFile: ..., page: ..., chunkIndex: ..., text: ..., tokens: ..., embeddingJson: ..., });
+
+// You can also pass in a `DataConnect` instance to the `MutationRef` function.
+const dataConnect = getDataConnect(connectorConfig);
+const ref = createLegalChunkRef(dataConnect, createLegalChunkVars);
+
+// Call `executeMutation()` on the reference to execute the mutation.
+// You can use the `await` keyword to wait for the promise to resolve.
+const { data } = await executeMutation(ref);
+
+console.log(data.legalChunk_insert);
+
+// Or, you can use the `Promise` API.
+executeMutation(ref).then((response) => {
+  const data = response.data;
+  console.log(data.legalChunk_insert);
 });
 ```
 

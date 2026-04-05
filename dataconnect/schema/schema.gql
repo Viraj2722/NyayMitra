@@ -30,6 +30,21 @@ type UserQuery @table {
   isUrgent: Boolean! # Drives the 100/181 helpline trigger
   isAnonymous: Boolean! # HUGE WOW FACTOR parameter for judges
   aiResponse: String
+  ragVerificationStatus: String # verified | partially_verified | not_verified
+  ragConfidence: Float # 0.0 to 1.0 confidence estimate
+  ragCitationsJson: String # JSON-serialized citations for auditability
+  createdAt: Timestamp! @default(expr: "request.time")
+}
+
+type LegalChunk @table {
+  lawName: String!
+  sourceUrl: String
+  sourceFile: String
+  page: Int
+  chunkIndex: Int!
+  text: String!
+  tokens: [String]!
+  embeddingJson: String
   createdAt: Timestamp! @default(expr: "request.time")
 }
 

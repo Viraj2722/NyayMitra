@@ -58,6 +58,21 @@ export interface CreateLegalAidCenterVariables {
   description?: string | null;
 }
 
+export interface CreateLegalChunkData {
+  legalChunk_insert: LegalChunk_Key;
+}
+
+export interface CreateLegalChunkVariables {
+  lawName: string;
+  sourceUrl?: string | null;
+  sourceFile?: string | null;
+  page?: number | null;
+  chunkIndex: number;
+  text: string;
+  tokens: string[];
+  embeddingJson?: string | null;
+}
+
 export interface CreateUserData {
   user_insert: User_Key;
 }
@@ -77,6 +92,9 @@ export interface CreateUserQueryVariables {
   isUrgent: boolean;
   isAnonymous: boolean;
   aiResponse?: string | null;
+  ragVerificationStatus?: string | null;
+  ragConfidence?: number | null;
+  ragCitationsJson?: string | null;
 }
 
 export interface CreateUserVariables {
@@ -103,6 +121,72 @@ export interface GetUserByUidVariables {
 export interface LegalAidCenter_Key {
   id: UUIDString;
   __typename?: 'LegalAidCenter_Key';
+}
+
+export interface LegalChunk_Key {
+  id: UUIDString;
+  __typename?: 'LegalChunk_Key';
+}
+
+export interface ListLegalChunksByLawData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+
+export interface ListLegalChunksByLawVariables {
+  lawName: string;
+  limit: number;
+}
+
+export interface SearchLegalChunksByLawData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+
+export interface SearchLegalChunksByLawVariables {
+  lawName: string;
+  term: string;
+  limit: number;
+}
+
+export interface SearchLegalChunksData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+
+export interface SearchLegalChunksVariables {
+  term: string;
+  limit: number;
 }
 
 export interface UpsertUserProfileData {
@@ -210,4 +294,52 @@ export const createAppointmentWithCenterRef: CreateAppointmentWithCenterRef;
 
 export function createAppointmentWithCenter(vars: CreateAppointmentWithCenterVariables): MutationPromise<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
 export function createAppointmentWithCenter(dc: DataConnect, vars: CreateAppointmentWithCenterVariables): MutationPromise<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+
+interface CreateLegalChunkRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: CreateLegalChunkVariables): MutationRef<CreateLegalChunkData, CreateLegalChunkVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: CreateLegalChunkVariables): MutationRef<CreateLegalChunkData, CreateLegalChunkVariables>;
+  operationName: string;
+}
+export const createLegalChunkRef: CreateLegalChunkRef;
+
+export function createLegalChunk(vars: CreateLegalChunkVariables): MutationPromise<CreateLegalChunkData, CreateLegalChunkVariables>;
+export function createLegalChunk(dc: DataConnect, vars: CreateLegalChunkVariables): MutationPromise<CreateLegalChunkData, CreateLegalChunkVariables>;
+
+interface SearchLegalChunksRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: SearchLegalChunksVariables): QueryRef<SearchLegalChunksData, SearchLegalChunksVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: SearchLegalChunksVariables): QueryRef<SearchLegalChunksData, SearchLegalChunksVariables>;
+  operationName: string;
+}
+export const searchLegalChunksRef: SearchLegalChunksRef;
+
+export function searchLegalChunks(vars: SearchLegalChunksVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksData, SearchLegalChunksVariables>;
+export function searchLegalChunks(dc: DataConnect, vars: SearchLegalChunksVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksData, SearchLegalChunksVariables>;
+
+interface SearchLegalChunksByLawRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: SearchLegalChunksByLawVariables): QueryRef<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: SearchLegalChunksByLawVariables): QueryRef<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+  operationName: string;
+}
+export const searchLegalChunksByLawRef: SearchLegalChunksByLawRef;
+
+export function searchLegalChunksByLaw(vars: SearchLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+export function searchLegalChunksByLaw(dc: DataConnect, vars: SearchLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+
+interface ListLegalChunksByLawRef {
+  /* Allow users to create refs without passing in DataConnect */
+  (vars: ListLegalChunksByLawVariables): QueryRef<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+  /* Allow users to pass in custom DataConnect instances */
+  (dc: DataConnect, vars: ListLegalChunksByLawVariables): QueryRef<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+  operationName: string;
+}
+export const listLegalChunksByLawRef: ListLegalChunksByLawRef;
+
+export function listLegalChunksByLaw(vars: ListLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+export function listLegalChunksByLaw(dc: DataConnect, vars: ListLegalChunksByLawVariables, options?: ExecuteQueryOptions): QueryPromise<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
 

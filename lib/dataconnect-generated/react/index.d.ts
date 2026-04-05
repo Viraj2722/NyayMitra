@@ -1,4 +1,4 @@
-import { CreateUserData, CreateUserVariables, GetUserByUidData, GetUserByUidVariables, UpsertUserProfileData, UpsertUserProfileVariables, CreateLegalAidCenterData, CreateLegalAidCenterVariables, CreateUserQueryData, CreateUserQueryVariables, CreateAppointmentData, CreateAppointmentVariables, CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables } from '../';
+import { CreateUserData, CreateUserVariables, GetUserByUidData, GetUserByUidVariables, UpsertUserProfileData, UpsertUserProfileVariables, CreateLegalAidCenterData, CreateLegalAidCenterVariables, CreateUserQueryData, CreateUserQueryVariables, CreateAppointmentData, CreateAppointmentVariables, CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables, CreateLegalChunkData, CreateLegalChunkVariables, SearchLegalChunksData, SearchLegalChunksVariables, SearchLegalChunksByLawData, SearchLegalChunksByLawVariables, ListLegalChunksByLawData, ListLegalChunksByLawVariables } from '../';
 import { UseDataConnectQueryResult, useDataConnectQueryOptions, UseDataConnectMutationResult, useDataConnectMutationOptions} from '@tanstack-query-firebase/react/data-connect';
 import { UseQueryResult, UseMutationResult} from '@tanstack/react-query';
 import { DataConnect } from 'firebase/data-connect';
@@ -25,3 +25,15 @@ export function useCreateAppointment(dc: DataConnect, options?: useDataConnectMu
 
 export function useCreateAppointmentWithCenter(options?: useDataConnectMutationOptions<CreateAppointmentWithCenterData, FirebaseError, CreateAppointmentWithCenterVariables>): UseDataConnectMutationResult<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
 export function useCreateAppointmentWithCenter(dc: DataConnect, options?: useDataConnectMutationOptions<CreateAppointmentWithCenterData, FirebaseError, CreateAppointmentWithCenterVariables>): UseDataConnectMutationResult<CreateAppointmentWithCenterData, CreateAppointmentWithCenterVariables>;
+
+export function useCreateLegalChunk(options?: useDataConnectMutationOptions<CreateLegalChunkData, FirebaseError, CreateLegalChunkVariables>): UseDataConnectMutationResult<CreateLegalChunkData, CreateLegalChunkVariables>;
+export function useCreateLegalChunk(dc: DataConnect, options?: useDataConnectMutationOptions<CreateLegalChunkData, FirebaseError, CreateLegalChunkVariables>): UseDataConnectMutationResult<CreateLegalChunkData, CreateLegalChunkVariables>;
+
+export function useSearchLegalChunks(vars: SearchLegalChunksVariables, options?: useDataConnectQueryOptions<SearchLegalChunksData>): UseDataConnectQueryResult<SearchLegalChunksData, SearchLegalChunksVariables>;
+export function useSearchLegalChunks(dc: DataConnect, vars: SearchLegalChunksVariables, options?: useDataConnectQueryOptions<SearchLegalChunksData>): UseDataConnectQueryResult<SearchLegalChunksData, SearchLegalChunksVariables>;
+
+export function useSearchLegalChunksByLaw(vars: SearchLegalChunksByLawVariables, options?: useDataConnectQueryOptions<SearchLegalChunksByLawData>): UseDataConnectQueryResult<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+export function useSearchLegalChunksByLaw(dc: DataConnect, vars: SearchLegalChunksByLawVariables, options?: useDataConnectQueryOptions<SearchLegalChunksByLawData>): UseDataConnectQueryResult<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+
+export function useListLegalChunksByLaw(vars: ListLegalChunksByLawVariables, options?: useDataConnectQueryOptions<ListLegalChunksByLawData>): UseDataConnectQueryResult<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+export function useListLegalChunksByLaw(dc: DataConnect, vars: ListLegalChunksByLawVariables, options?: useDataConnectQueryOptions<ListLegalChunksByLawData>): UseDataConnectQueryResult<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;

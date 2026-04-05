@@ -49,6 +49,13 @@ type EmergencyNumber = {
   number: string;
 };
 
+type CitationItem = {
+  law_name: string;
+  page?: number | null;
+  source_url?: string;
+  excerpt?: string;
+};
+
 type SafetyStatus = "unknown" | "safe" | "unsafe";
 
 const SAFETY_STATUS_KEY = "nyaymitra_safety_status";
@@ -86,7 +93,9 @@ const normalizeRights = (raw: unknown): RightCard[] => {
       if (item && typeof item === "object") {
         const obj = item as Record<string, unknown>;
         const title = String(obj.title ?? obj.right ?? obj.name ?? "").trim();
-        const desc = String(obj.desc ?? obj.description ?? obj.detail ?? "").trim();
+        const desc = String(
+          obj.desc ?? obj.description ?? obj.detail ?? "",
+        ).trim();
         if (!title && !desc) return null;
         return { title: title || "Legal Right", desc };
       }
@@ -105,7 +114,9 @@ const normalizeSteps = (raw: unknown): StepItem[] => {
       if (item && typeof item === "object") {
         const obj = item as Record<string, unknown>;
         const title = String(obj.title ?? obj.step ?? obj.action ?? "").trim();
-        const desc = String(obj.desc ?? obj.description ?? obj.detail ?? "").trim();
+        const desc = String(
+          obj.desc ?? obj.description ?? obj.detail ?? "",
+        ).trim();
         if (!title && !desc) return null;
         return { title: title || "Step", desc };
       }
@@ -119,7 +130,9 @@ const BACKEND_BASE_URL =
 
 const toNumber = (value: unknown): number | undefined => {
   const parsed = typeof value === "string" ? Number(value) : value;
-  return typeof parsed === "number" && Number.isFinite(parsed) ? parsed : undefined;
+  return typeof parsed === "number" && Number.isFinite(parsed)
+    ? parsed
+    : undefined;
 };
 
 const normalizeCenter = (raw: unknown): Center | null => {
@@ -150,7 +163,8 @@ const normalizeCenter = (raw: unknown): Center | null => {
     longitude,
     lat: latitude,
     lng: longitude,
-    freeServices: typeof obj.freeServices === "boolean" ? obj.freeServices : undefined,
+    freeServices:
+      typeof obj.freeServices === "boolean" ? obj.freeServices : undefined,
     source: typeof obj.source === "string" ? obj.source : undefined,
   };
 };
@@ -171,7 +185,9 @@ const normalizeEmergencyNumbers = (raw: unknown): EmergencyNumber[] => {
       if (!item || typeof item !== "object") return null;
       const obj = item as Record<string, unknown>;
       const name = String(obj.name ?? obj.title ?? obj.label ?? "").trim();
-      const number = String(obj.number ?? obj.phone ?? obj.contact ?? "").trim();
+      const number = String(
+        obj.number ?? obj.phone ?? obj.contact ?? "",
+      ).trim();
 
       if (!number) return null;
 
@@ -181,6 +197,48 @@ const normalizeEmergencyNumbers = (raw: unknown): EmergencyNumber[] => {
       };
     })
     .filter((item): item is EmergencyNumber => Boolean(item));
+};
+
+const normalizeCitations = (raw: unknown): CitationItem[] => {
+  if (!Array.isArray(raw)) return [];
+
+  const mapped: Array<CitationItem | null> = raw.map((item) => {
+    if (typeof item === "string") {
+      const text = item.trim();
+      if (!text) return null;
+      return {
+        law_name: "Unverified Source",
+        excerpt: text,
+      };
+    }
+
+    if (!item || typeof item !== "object") return null;
+
+    const obj = item as Record<string, unknown>;
+    const lawName = String(obj.law_name ?? obj.law ?? "").trim();
+    const sourceUrl = String(obj.source_url ?? obj.url ?? "").trim();
+    const excerpt = String(obj.excerpt ?? obj.quote ?? "").trim();
+    const pageValue = obj.page;
+    const pageNumber =
+      typeof pageValue === "number"
+        ? pageValue
+        : typeof pageValue === "string" && pageValue.trim().length > 0
+          ? Number(pageValue)
+          : null;
+
+    if (!lawName && !sourceUrl && !excerpt) return null;
+
+    return {
+      law_name: lawName || "Legal Source",
+      page: Number.isFinite(pageNumber as number)
+        ? (pageNumber as number)
+        : null,
+      source_url: sourceUrl || undefined,
+      excerpt: excerpt || undefined,
+    };
+  });
+
+  return mapped.filter((item): item is CitationItem => item !== null);
 };
 
 const haversineKm = (from: UserLocation, to: UserLocation): number => {
@@ -214,7 +272,10 @@ const parseUserLocation = (raw: string | null): UserLocation | null => {
   return null;
 };
 
-const buildMapsQuery = (center: Center | null, userLocation: UserLocation | null): string => {
+const buildMapsQuery = (
+  center: Center | null,
+  userLocation: UserLocation | null,
+): string => {
   if (center?.latitude != null && center?.longitude != null) {
     return `${center.latitude},${center.longitude}`;
   }
@@ -230,19 +291,76 @@ const buildMapsQuery = (center: Center | null, userLocation: UserLocation | null
   return "Nearby Legal Aid Center";
 };
 
+const getSafetyCopy = (language: string) => {
+  const normalized = (language || "English").toLowerCase();
+
+  if (
+    normalized.includes("hindi") ||
+    normalized.includes("हिंदी") ||
+    normalized.includes("हिन्दी")
+  ) {
+    return {
+      title: "सुरक्षा जांच",
+      question: "क्या आप अभी सुरक्षित हैं?",
+      subtitle:
+        "यदि आप तुरंत खतरे में हैं, तो 'नहीं' दबाएं और तुरंत इमरजेंसी सहायता को कॉल करें।",
+      yes: "हाँ",
+      no: "नहीं",
+      emergencyTitle: "तुरंत सहायता",
+      emergencyAction: "आपने बताया कि आप सुरक्षित नहीं हैं। अभी कॉल करें।",
+      forLabel: "के लिए",
+      callNow: "अभी कॉल करें",
+    };
+  }
+
+  if (normalized.includes("marathi") || normalized.includes("मराठी")) {
+    return {
+      title: "सुरक्षितता तपासणी",
+      question: "तुम्ही आत्ता सुरक्षित आहात का?",
+      subtitle:
+        "तुम्हाला तात्काळ धोका असल्यास, 'नाही' निवडा आणि लगेच आपत्कालीन मदतला कॉल करा.",
+      yes: "हो",
+      no: "नाही",
+      emergencyTitle: "आपत्कालीन मदत",
+      emergencyAction: "तुम्ही सुरक्षित नसल्याचे सांगितले आहे. आत्ता कॉल करा.",
+      forLabel: "साठी",
+      callNow: "आत्ता कॉल करा",
+    };
+  }
+
+  return {
+    title: "Safety Check",
+    question: "Are you safe right now?",
+    subtitle:
+      "If you are in immediate danger, tap No and call emergency support right away.",
+    yes: "Yes",
+    no: "No",
+    emergencyTitle: "Emergency Support",
+    emergencyAction: "You marked that you are not safe. Call now.",
+    forLabel: "For",
+    callNow: "Call Now",
+  };
+};
+
 export default function ResultsPage() {
   const { t, language } = useLanguage();
   const selectedLanguage = language as AppLanguage;
   const { user } = useAuth();
-  
+
   const getCategoryLabel = (cat: string) => {
     const c = cat.toLowerCase();
-    if (c.includes("labor") || c.includes("work")) return t("intake.labor.label", "Work / Salary issue");
-    if (c.includes("domestic")) return t("intake.domestic.label", "Domestic Violence");
-    if (c.includes("tenancy") || c.includes("rent")) return t("intake.tenancy.label", "Renting / Housing");
-    if (c.includes("consumer") || c.includes("bill")) return t("intake.consumer.label", "Consumer Complaint");
-    if (c.includes("family") || c.includes("marriage")) return t("intake.family.label", "Family / Marriage");
-    if (c.includes("land") || c.includes("property")) return t("intake.land.label", "Land Dispute");
+    if (c.includes("labor") || c.includes("work"))
+      return t("intake.labor.label", "Work / Salary issue");
+    if (c.includes("domestic"))
+      return t("intake.domestic.label", "Domestic Violence");
+    if (c.includes("tenancy") || c.includes("rent"))
+      return t("intake.tenancy.label", "Renting / Housing");
+    if (c.includes("consumer") || c.includes("bill"))
+      return t("intake.consumer.label", "Consumer Complaint");
+    if (c.includes("family") || c.includes("marriage"))
+      return t("intake.family.label", "Family / Marriage");
+    if (c.includes("land") || c.includes("property"))
+      return t("intake.land.label", "Land Dispute");
     return cat;
   };
 
@@ -255,36 +373,59 @@ export default function ResultsPage() {
   const [centers, setCenters] = useState<Center[]>([]);
   const [loadingCenters, setLoadingCenters] = useState(true);
   const [urgency, setUrgency] = useState<string>("normal");
-  const [category, setCategory] = useState<string>(t("common.loading", "Loading..."));
+  const [category, setCategory] = useState<string>(
+    t("common.loading", "Loading..."),
+  );
   const [rights, setRights] = useState<RightCard[]>([
     {
       title: t("results.right1.title", "Right to Wages"),
-      desc: t("results.right1.desc", "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act."),
+      desc: t(
+        "results.right1.desc",
+        "You are entitled to be paid within 7 days of the wage period under the Payment of Wages Act.",
+      ),
     },
     {
       title: t("results.right2.title", "Protection from Unfair Dismissal"),
-      desc: t("results.right2.desc", "An employer must provide proper notice before termination under the Industrial Disputes Act."),
+      desc: t(
+        "results.right2.desc",
+        "An employer must provide proper notice before termination under the Industrial Disputes Act.",
+      ),
     },
     {
       title: t("results.right3.title", "Right to Free Legal Aid"),
-      desc: t("results.right3.desc", "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation."),
+      desc: t(
+        "results.right3.desc",
+        "As a worker earning less than ₹3 Lakh/year, you qualify for entirely free legal representation.",
+      ),
     },
   ]);
   const [nextSteps, setNextSteps] = useState<StepItem[]>([
     {
       title: t("results.gatherEvidence", "Gather Evidence"),
-      desc: t("results.gatherEvidenceDesc", "Collect all employment contracts, ID cards, and WhatsApp messages with your employer."),
+      desc: t(
+        "results.gatherEvidenceDesc",
+        "Collect all employment contracts, ID cards, and WhatsApp messages with your employer.",
+      ),
     },
     {
       title: t("results.draftComplaint", "Draft a Complaint"),
-      desc: t("results.draftComplaintDesc", "Write a simple timeline of events in your preferred language."),
+      desc: t(
+        "results.draftComplaintDesc",
+        "Write a simple timeline of events in your preferred language.",
+      ),
     },
     {
       title: t("results.visitCenter", "Visit a Free Center"),
-      desc: t("results.visitCenterDesc", "Book an appointment or walk into a Legal Aid center listed below."),
+      desc: t(
+        "results.visitCenterDesc",
+        "Book an appointment or walk into a Legal Aid center listed below.",
+      ),
     },
   ]);
-  const [emergencyNumbers, setEmergencyNumbers] = useState<EmergencyNumber[]>([]);
+  const [emergencyNumbers, setEmergencyNumbers] = useState<EmergencyNumber[]>(
+    [],
+  );
+  const [citations, setCitations] = useState<CitationItem[]>([]);
   const [mapSearchQuery, setMapSearchQuery] = useState<string>("");
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [safetyStatus, setSafetyStatus] = useState<SafetyStatus>("unknown");
@@ -333,9 +474,13 @@ export default function ResultsPage() {
           }
         }
 
-        const storedEmergency = localStorage.getItem("nyaymitra_emergency_numbers");
+        const storedEmergency = localStorage.getItem(
+          "nyaymitra_emergency_numbers",
+        );
         if (storedEmergency) {
-          const parsedEmergency = normalizeEmergencyNumbers(JSON.parse(storedEmergency));
+          const parsedEmergency = normalizeEmergencyNumbers(
+            JSON.parse(storedEmergency),
+          );
           if (parsedEmergency.length > 0) {
             setEmergencyNumbers(parsedEmergency);
           } else {
@@ -345,7 +490,10 @@ export default function ResultsPage() {
           setEmergencyNumbers(DEFAULT_EMERGENCY_NUMBERS);
         }
 
-        const storedMapQuery = localStorage.getItem("nyaymitra_map_search_query");
+        const storedMapQuery = localStorage.getItem(
+          "nyaymitra_map_search_query",
+        );
+        const storedCitations = localStorage.getItem("nyaymitra_citations");
         const storedCenters = localStorage.getItem("nyaymitra_centers");
         const normalizedStoredCenters = storedCenters
           ? normalizeCenterList(JSON.parse(storedCenters))
@@ -369,31 +517,41 @@ export default function ResultsPage() {
           return center;
         });
 
-        withDistances.sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+        withDistances.sort(
+          (a, b) =>
+            (a.distance ?? Number.POSITIVE_INFINITY) -
+            (b.distance ?? Number.POSITIVE_INFINITY),
+        );
 
         if (withDistances.length > 0) {
           setCenters(withDistances);
         } else {
           const response = await fetch(`${BACKEND_BASE_URL}/api/centers/`);
           if (response.ok) {
-            const liveCenters = normalizeCenterList(await response.json()).map((center) => {
-              if (
-                userLocation &&
-                typeof center.latitude === "number" &&
-                typeof center.longitude === "number"
-              ) {
-                return {
-                  ...center,
-                  distance: haversineKm(userLocation, {
-                    lat: center.latitude,
-                    lng: center.longitude,
-                  }),
-                };
-              }
+            const liveCenters = normalizeCenterList(await response.json()).map(
+              (center) => {
+                if (
+                  userLocation &&
+                  typeof center.latitude === "number" &&
+                  typeof center.longitude === "number"
+                ) {
+                  return {
+                    ...center,
+                    distance: haversineKm(userLocation, {
+                      lat: center.latitude,
+                      lng: center.longitude,
+                    }),
+                  };
+                }
 
-              return center;
-            });
-            liveCenters.sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+                return center;
+              },
+            );
+            liveCenters.sort(
+              (a, b) =>
+                (a.distance ?? Number.POSITIVE_INFINITY) -
+                (b.distance ?? Number.POSITIVE_INFINITY),
+            );
             setCenters(liveCenters);
           } else {
             setCenters([]);
@@ -406,6 +564,13 @@ export default function ResultsPage() {
           setMapSearchQuery(buildMapsQuery(withDistances[0], userLocation));
         } else if (storedCategory && storedCategory.trim().length > 0) {
           setMapSearchQuery(`Nearest ${storedCategory} legal aid center`);
+        }
+
+        if (storedCitations) {
+          const parsedCitations = normalizeCitations(
+            JSON.parse(storedCitations),
+          );
+          setCitations(parsedCitations);
         }
       } catch (error) {
         console.error("Error loading legal centers from storage", error);
@@ -431,16 +596,26 @@ export default function ResultsPage() {
 
     const sortedCenters = centers
       .map((center) => {
-        if (typeof center.latitude === "number" && typeof center.longitude === "number") {
+        if (
+          typeof center.latitude === "number" &&
+          typeof center.longitude === "number"
+        ) {
           return {
             ...center,
-            distance: haversineKm(userLocation, { lat: center.latitude, lng: center.longitude }),
+            distance: haversineKm(userLocation, {
+              lat: center.latitude,
+              lng: center.longitude,
+            }),
           };
         }
 
         return center;
       })
-      .sort((a, b) => (a.distance ?? Number.POSITIVE_INFINITY) - (b.distance ?? Number.POSITIVE_INFINITY));
+      .sort(
+        (a, b) =>
+          (a.distance ?? Number.POSITIVE_INFINITY) -
+          (b.distance ?? Number.POSITIVE_INFINITY),
+      );
 
     setCenters(sortedCenters);
 
@@ -459,7 +634,9 @@ export default function ResultsPage() {
     emergencyNumbers.length > 0 ? emergencyNumbers : DEFAULT_EMERGENCY_NUMBERS;
 
   const primaryEmergencyContact =
-    emergencyActions.find((item) => item.number === "112") || emergencyActions[0];
+    emergencyActions.find((item) => item.number === "112") ||
+    emergencyActions[0];
+  const safetyCopy = getSafetyCopy(language);
 
   const generatePDF = () => {
     window.print();
@@ -513,11 +690,21 @@ export default function ResultsPage() {
         setSuccess(true);
         setTimeout(() => setSuccess(false), 5000);
       } else {
-        setError(t("results.formSubmitError", "Failed to book appointment. Please try again."));
+        setError(
+          t(
+            "results.formSubmitError",
+            "Failed to book appointment. Please try again.",
+          ),
+        );
       }
     } catch (err) {
       console.error("Error booking appointment", err);
-      setError(t("results.formUnexpected", "An unexpected error occurred. Please try again."));
+      setError(
+        t(
+          "results.formUnexpected",
+          "An unexpected error occurred. Please try again.",
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -529,7 +716,10 @@ export default function ResultsPage() {
         <div className="w-full bg-red-600 text-white font-semibold py-3 px-4 flex justify-center items-center gap-2">
           <AlertCircle className="w-5 h-5 animate-pulse" />
           <span>
-            {t("results.urgent", "Need immediate help? Call Women Helpline: 181, Police: 100")}
+            {t(
+              "results.urgent",
+              "Need immediate help? Call Women Helpline: 181, Police: 100",
+            )}
           </span>
         </div>
       )}
@@ -539,26 +729,26 @@ export default function ResultsPage() {
         {showSafetyPrompt && (
           <section className="print:hidden w-full bg-white dark:bg-zinc-900 border border-red-100 dark:border-red-900/40 rounded-2xl p-5 shadow-sm">
             <p className="text-sm font-semibold text-red-700 mb-1">
-              {t("results.safetyTitle", "Safety Check")}
+              {safetyCopy.title}
             </p>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-3">
-              {t("results.safetyQuestion", "Are you safe right now?")}
+              {safetyCopy.question}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-              {t("results.safetySubtitle", "If you are in immediate danger, tap No and call emergency support right away.")}
+              {safetyCopy.subtitle}
             </p>
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => handleSafetySelection(true)}
                 className="px-4 py-2 rounded-lg bg-green-100 hover:bg-green-200 text-green-900 font-semibold"
               >
-                {t("common.yes", "Yes")}
+                {safetyCopy.yes}
               </button>
               <button
                 onClick={() => handleSafetySelection(false)}
                 className="px-4 py-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-900 font-semibold"
               >
-                {t("common.no", "No")}
+                {safetyCopy.no}
               </button>
             </div>
           </section>
@@ -567,10 +757,10 @@ export default function ResultsPage() {
         {safetyStatus === "unsafe" && primaryEmergencyContact && (
           <section className="print:hidden w-full bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/70 rounded-2xl p-5 shadow-sm">
             <p className="text-sm font-semibold text-red-700 dark:text-red-300 mb-1">
-              {t("results.emergencyNow", "Emergency Support")}
+              {safetyCopy.emergencyTitle}
             </p>
             <h2 className="text-lg font-bold text-red-900 dark:text-red-100 mb-3">
-              {t("results.emergencyAction", "You marked that you are not safe. Call now.")}
+              {safetyCopy.emergencyAction}
             </h2>
 
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -580,15 +770,17 @@ export default function ResultsPage() {
                   className="bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-900/40 rounded-xl p-3"
                 >
                   <p className="text-xs font-semibold uppercase tracking-wide text-red-700 dark:text-red-300">
-                    {t("results.for", "For")}: {item.name}
+                    {safetyCopy.forLabel}: {item.name}
                   </p>
-                  <p className="mt-1 text-base font-bold text-red-800 dark:text-red-200">{item.number}</p>
+                  <p className="mt-1 text-base font-bold text-red-800 dark:text-red-200">
+                    {item.number}
+                  </p>
                   <a
                     href={`tel:${item.number}`}
                     className="mt-2 inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-400 text-white px-3 py-1.5 rounded-lg text-sm font-bold"
                   >
                     <AlertCircle className="w-4 h-4" />
-                    {t("results.callNow", "Call Now")}
+                    {safetyCopy.callNow}
                   </a>
                 </div>
               ))}
@@ -600,31 +792,58 @@ export default function ResultsPage() {
         <div className="text-center space-y-4 print:hidden">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-[var(--color-deep-blue)] dark:text-blue-300 font-bold text-sm shadow-sm capitalize">
             <span className="w-2 h-2 rounded-full bg-[var(--color-deep-blue)]" />
-            {t("results.category", "Category Detected")}: {getCategoryLabel(category)}
+            {t("results.category", "Category Detected")}:{" "}
+            {getCategoryLabel(category)}
           </div>
-          
+
           <h1 className="text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight">
             {t("results.title", "Your Legal Guidance")}
           </h1>
           <p className="text-gray-500 dark:text-gray-300 max-w-lg mx-auto">
-            {t("results.subtitle", "Based on your description, here are your rights under Indian Law and the next steps to take.")}
+            {t(
+              "results.subtitle",
+              "Based on your description, here are your rights under Indian Law and the next steps to take.",
+            )}
           </p>
           <div className="pt-4">
-            <button onClick={generatePDF} className="bg-[var(--color-deep-blue)] hover:bg-blue-900 text-white font-bold py-2.5 px-6 rounded-full shadow-md hover:scale-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 mx-auto">
-               <Download className="w-4 h-4"/> {PDF_BTN_LABELS[selectedLanguage] || "Download Legal Report (PDF)"}
+            <button
+              onClick={generatePDF}
+              className="bg-[var(--color-deep-blue)] hover:bg-blue-900 text-white font-bold py-2.5 px-6 rounded-full shadow-md hover:scale-105 active:scale-95 transition-all text-sm flex items-center justify-center gap-2 mx-auto"
+            >
+              <Download className="w-4 h-4" />{" "}
+              {PDF_BTN_LABELS[selectedLanguage] ||
+                "Download Legal Report (PDF)"}
             </button>
           </div>
         </div>
 
         {/* Print only header - PRINT ONLY */}
         <div className="hidden print:block mb-6 border-b-2 border-gray-400 pb-5">
-          <h1 className="text-3xl font-black text-black uppercase tracking-tight">NYAYMITRA</h1>
-          <h2 className="text-xl font-bold text-gray-800 uppercase mt-1">Official Legal Guidance Report</h2>
+          <h1 className="text-3xl font-black text-black uppercase tracking-tight">
+            NYAYMITRA
+          </h1>
+          <h2 className="text-xl font-bold text-gray-800 uppercase mt-1">
+            Official Legal Guidance Report
+          </h2>
           <div className="mt-4 flex flex-col gap-1.5 text-sm text-black">
-            <p><span className="font-semibold">Generated For:</span> {user?.displayName || "Anonymous User"} {user?.email ? `(${user.email})` : ""}</p>
-            <p><span className="font-semibold">Date:</span> {dateStr}</p>
-            <p><span className="font-semibold">Legal Issue Category:</span> <span className="uppercase">{getCategoryLabel(category)}</span></p>
-            <p><span className="font-semibold">Assessment Urgency:</span> <span className="uppercase text-red-600 font-bold">{urgency}</span></p>
+            <p>
+              <span className="font-semibold">Generated For:</span>{" "}
+              {user?.displayName || "Anonymous User"}{" "}
+              {user?.email ? `(${user.email})` : ""}
+            </p>
+            <p>
+              <span className="font-semibold">Date:</span> {dateStr}
+            </p>
+            <p>
+              <span className="font-semibold">Legal Issue Category:</span>{" "}
+              <span className="uppercase">{getCategoryLabel(category)}</span>
+            </p>
+            <p>
+              <span className="font-semibold">Assessment Urgency:</span>{" "}
+              <span className="uppercase text-red-600 font-bold">
+                {urgency}
+              </span>
+            </p>
           </div>
         </div>
 
@@ -638,24 +857,60 @@ export default function ResultsPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 print:grid-cols-1 print:gap-4 print:block">
-            {rights.map((right, i) => (
-              <div
-                key={i}
-                className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-orange-100 dark:border-zinc-800 opacity-0 relative overflow-hidden group print:!bg-white print:!text-black print:opacity-100 print:!border-gray-400 print:border print:shadow-none print:break-inside-avoid print:mb-6 print:p-6 print:![animation:none] print:w-full print:box-border"
-                style={{
-                  animation: `slideUpFadeIn 0.6s ease-out forwards`,
-                  animationDelay: `${i * 0.2}s`,
-                }}
-              >
-                <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-saffron)] transition-all group-hover:w-2 print:hidden" />
-                <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2 print:!text-black">
-                  {right.title}
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed print:!text-black print:whitespace-normal print:break-words">
-                  {right.desc}
-                </p>
-              </div>
-            ))}
+            {rights.map((right, i) =>
+              (() => {
+                const citation = citations[i];
+                return (
+                  <div
+                    key={i}
+                    className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-orange-100 dark:border-zinc-800 opacity-0 relative overflow-hidden group print:!bg-white print:!text-black print:opacity-100 print:!border-gray-400 print:border print:shadow-none print:break-inside-avoid print:mb-6 print:p-6 print:![animation:none] print:w-full print:box-border"
+                    style={{
+                      animation: `slideUpFadeIn 0.6s ease-out forwards`,
+                      animationDelay: `${i * 0.2}s`,
+                    }}
+                  >
+                    <div className="absolute top-0 left-0 w-1 h-full bg-[var(--color-saffron)] transition-all group-hover:w-2 print:hidden" />
+                    <h3 className="font-bold text-gray-900 dark:text-white text-lg mb-2 print:!text-black">
+                      {right.title}
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed print:!text-black print:whitespace-normal print:break-words">
+                      {right.desc}
+                    </p>
+                    <div className="mt-3 rounded-lg border border-amber-200/70 bg-amber-50/60 dark:border-zinc-700 dark:bg-zinc-800/60 p-3 text-xs">
+                      {citation ? (
+                        <>
+                          <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                            {citation.law_name}
+                            {typeof citation.page === "number"
+                              ? ` (Page ${citation.page})`
+                              : ""}
+                          </p>
+                          {citation.excerpt && (
+                            <p className="mt-1 line-clamp-4 text-zinc-600 dark:text-zinc-300">
+                              {citation.excerpt}
+                            </p>
+                          )}
+                          {citation.source_url && (
+                            <a
+                              href={citation.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-block text-blue-700 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200 font-semibold"
+                            >
+                              Open document
+                            </a>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-zinc-600 dark:text-zinc-300">
+                          No verified source found for this right yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })(),
+            )}
           </div>
         </section>
 
@@ -664,19 +919,28 @@ export default function ResultsPage() {
           <div className="print:mb-8">
             <div className="flex items-center gap-2 mb-6 border-b pb-2 border-gray-200 print:border-gray-500">
               <CheckCircle className="w-6 h-6 text-[var(--color-deep-blue)] print:!text-black" />
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-white print:!text-black">{t("results.nextSteps", "Next Steps")}</h2>
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-white print:!text-black">
+                {t("results.nextSteps", "Next Steps")}
+              </h2>
             </div>
             <ol className="space-y-6 relative border-l-2 border-blue-100 print:border-l-0 print:ml-0 print:space-y-6 ml-3">
               {nextSteps.map((step, index) => (
-                <li key={`${step.title}-${index}`} className="pl-6 relative print:static print:border print:border-gray-400 print:rounded-xl print:p-6 print:break-inside-avoid print:box-border print:w-full print:block">
+                <li
+                  key={`${step.title}-${index}`}
+                  className="pl-6 relative print:static print:border print:border-gray-400 print:rounded-xl print:p-6 print:break-inside-avoid print:box-border print:w-full print:block"
+                >
                   <div className="hidden print:block font-bold text-sm text-[var(--color-deep-blue)] mb-2 uppercase tracking-wider">
                     Step {index + 1}
                   </div>
                   <span className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-[var(--color-deep-blue)] text-white flex items-center justify-center text-xs font-bold ring-4 ring-zinc-50 print:hidden">
                     {index + 1}
                   </span>
-                  <h4 className="font-bold text-gray-800 dark:text-white print:!text-black text-lg mb-1">{step.title}</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 print:!text-black print:whitespace-normal print:break-words leading-relaxed">{step.desc}</p>
+                  <h4 className="font-bold text-gray-800 dark:text-white print:!text-black text-lg mb-1">
+                    {step.title}
+                  </h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mt-1 print:!text-black print:whitespace-normal print:break-words leading-relaxed">
+                    {step.desc}
+                  </p>
                 </li>
               ))}
             </ol>
@@ -705,7 +969,9 @@ export default function ResultsPage() {
 
             {emergencyNumbers.length > 0 && (
               <div className="mb-4 bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 rounded-xl p-3 print:hidden">
-                <p className="text-sm font-semibold text-red-700 mb-3 print:!text-black">Emergency Numbers</p>
+                <p className="text-sm font-semibold text-red-700 mb-3 print:!text-black">
+                  Emergency Numbers
+                </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 print:flex print:flex-col print:gap-4">
                   {emergencyNumbers.map((item) => (
                     <a
@@ -713,8 +979,12 @@ export default function ResultsPage() {
                       href={`tel:${item.number}`}
                       className="text-sm bg-white dark:bg-zinc-900 px-3 py-2 rounded-lg border border-red-100 dark:border-red-900/40 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors print:!bg-white print:!border-gray-400 print:!text-black print:p-4 print:block print:w-full print:rounded-lg"
                     >
-                      <span className="font-medium text-gray-800 dark:text-zinc-100 print:!text-black block mb-1">{item.name}</span>
-                      <span className="text-red-700 print:!text-black font-bold text-lg">{item.number}</span>
+                      <span className="font-medium text-gray-800 dark:text-zinc-100 print:!text-black block mb-1">
+                        {item.name}
+                      </span>
+                      <span className="text-red-700 print:!text-black font-bold text-lg">
+                        {item.number}
+                      </span>
                     </a>
                   ))}
                 </div>
@@ -724,12 +994,18 @@ export default function ResultsPage() {
             <div className="space-y-3 print:hidden">
               {loadingCenters && (
                 <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-sm text-gray-500 dark:text-gray-300 shadow-sm">
-                  {t("results.loadingCenters", "Loading legal centers from the database...")}
+                  {t(
+                    "results.loadingCenters",
+                    "Loading legal centers from the database...",
+                  )}
                 </div>
               )}
               {!loadingCenters && centers.length === 0 && (
                 <div className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 text-sm text-gray-500 dark:text-gray-300 shadow-sm">
-                  {t("results.noCenters", "No legal centers found in the database.")}
+                  {t(
+                    "results.noCenters",
+                    "No legal centers found in the database.",
+                  )}
                 </div>
               )}
               {centers.map((center) => (
@@ -738,24 +1014,29 @@ export default function ResultsPage() {
                   className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-gray-100 dark:border-zinc-800 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow"
                 >
                   <div>
-                    <h4 className="font-bold text-gray-900 dark:text-white">{center.name}</h4>
+                    <h4 className="font-bold text-gray-900 dark:text-white">
+                      {center.name}
+                    </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
                       {center.address}
-                      {typeof center.distance === "number" ? ` • ${center.distance.toFixed(2)} km` : ""}
+                      {typeof center.distance === "number"
+                        ? ` • ${center.distance.toFixed(2)} km`
+                        : ""}
                     </p>
                     <p className="text-xs font-medium text-[var(--color-deep-blue)] mt-1">
                       {center.phone}
                     </p>
-                    {typeof center.latitude === "number" && typeof center.longitude === "number" && (
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${center.latitude},${center.longitude}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold mt-1 inline-block print:hidden"
-                      >
-                        Open exact location
-                      </a>
-                    )}
+                    {typeof center.latitude === "number" &&
+                      typeof center.longitude === "number" && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${center.latitude},${center.longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 font-semibold mt-1 inline-block print:hidden"
+                        >
+                          Open exact location
+                        </a>
+                      )}
                   </div>
                   <button
                     onClick={() => {
@@ -790,8 +1071,17 @@ export default function ResultsPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-[slideUpFadeIn_0.3s_ease-out]">
             <div className="bg-[var(--color-deep-blue)] p-4 flex justify-between items-center text-white">
-              <h3 className="font-bold text-lg flex items-center gap-2"><Calendar className="w-5 h-5"/> {t("results.bookConsultation", "Book Consultation")}</h3>
-              <button onClick={() => { setIsBooking(false); setError(null); }} className="text-blue-200 hover:text-white transition-colors">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Calendar className="w-5 h-5" />{" "}
+                {t("results.bookConsultation", "Book Consultation")}
+              </h3>
+              <button
+                onClick={() => {
+                  setIsBooking(false);
+                  setError(null);
+                }}
+                className="text-blue-200 hover:text-white transition-colors"
+              >
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -805,79 +1095,113 @@ export default function ResultsPage() {
               )}
 
               <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{t("results.center", "Center")}</p>
-                <p className="font-semibold text-gray-900 dark:text-white">{selectedCenter.name}</p>
-                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{selectedCenter.phone}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {t("results.center", "Center")}
+                </p>
+                <p className="font-semibold text-gray-900 dark:text-white">
+                  {selectedCenter.name}
+                </p>
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                  {selectedCenter.phone}
+                </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.yourName", "Your Name")} <span className="text-red-500">*</span></label>
-                <input 
-                  required 
-                  name="name" 
-                  defaultValue={user?.displayName || ""} 
-                  type="text" 
-                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
-                  placeholder={t("results.namePlaceholder", "Ramesh Kumar")} 
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t("results.yourName", "Your Name")}{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  name="name"
+                  defaultValue={user?.displayName || ""}
+                  type="text"
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder={t("results.namePlaceholder", "Ramesh Kumar")}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.phoneNumber", "Phone Number")} <span className="text-red-500">*</span></label>
-                <input 
-                  required 
-                  name="phone" 
-                  type="tel" 
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t("results.phoneNumber", "Phone Number")}{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  name="phone"
+                  type="tel"
                   pattern="[0-9]{10,13}"
-                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
-                  placeholder={t("results.phonePlaceholder", "9876543210")} 
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder={t("results.phonePlaceholder", "9876543210")}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.preferredDate", "Preferred Date")} <span className="text-red-500">*</span></label>
-                  <input 
-                    required 
-                    name="date" 
-                    type="date" 
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t("results.preferredDate", "Preferred Date")}{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    required
+                    name="date"
+                    type="date"
+                    min={new Date().toISOString().split("T")[0]}
+                    className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.timeOptional", "Time (Optional)")}</label>
-                  <input 
-                    name="time" 
-                    type="time" 
-                    className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" 
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t("results.timeOptional", "Time (Optional)")}
+                  </label>
+                  <input
+                    name="time"
+                    type="time"
+                    className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("results.briefDescription", "Brief Description")} <span className="text-red-500">*</span></label>
-                <textarea 
-                  required 
-                  name="description" 
-                  rows={3} 
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t("results.briefDescription", "Brief Description")}{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  name="description"
+                  rows={3}
                   maxLength={500}
-                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none" 
-                  placeholder={t("results.descriptionPlaceholder", "Explain your legal issue briefly (e.g., unpaid wages, harassment, contract dispute)...")}
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                  placeholder={t(
+                    "results.descriptionPlaceholder",
+                    "Explain your legal issue briefly (e.g., unpaid wages, harassment, contract dispute)...",
+                  )}
                 ></textarea>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t("results.descriptionHelp", "This helps the legal advisor prepare for your consultation")}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {t(
+                    "results.descriptionHelp",
+                    "This helps the legal advisor prepare for your consultation",
+                  )}
+                </p>
               </div>
 
               <div className="pt-2 space-y-3">
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSubmitting}
                   className="w-full bg-[var(--color-saffron)] hover:bg-orange-600 disabled:bg-gray-400 text-white font-bold py-3 rounded-lg shadow-md transition-colors"
                 >
-                  {isSubmitting ? t("results.booking", "Booking...") : t("results.confirmBooking", "Confirm Booking")}
+                  {isSubmitting
+                    ? t("results.booking", "Booking...")
+                    : t("results.confirmBooking", "Confirm Booking")}
                 </button>
                 <p className="text-center text-xs text-gray-500 dark:text-gray-400 font-medium flex justify-center items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5"/> {t("results.confidential", "All information is kept completely confidential.")}
+                  <Shield className="w-3.5 h-3.5" />{" "}
+                  {t(
+                    "results.confidential",
+                    "All information is kept completely confidential.",
+                  )}
                 </p>
               </div>
             </form>
@@ -889,7 +1213,12 @@ export default function ResultsPage() {
       {success && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-900 text-white px-6 py-3 rounded-full font-bold shadow-xl flex items-center gap-3 animate-[slideUpFadeIn_0.3s_ease-out] z-50">
           <CheckCircle className="w-5 h-5 text-green-400" />
-          <span>{t("results.requestSent", "Your appointment request has been sent!")}</span>
+          <span>
+            {t(
+              "results.requestSent",
+              "Your appointment request has been sent!",
+            )}
+          </span>
         </div>
       )}
     </div>

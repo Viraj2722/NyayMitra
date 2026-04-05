@@ -18,6 +18,9 @@ You can also follow the instructions from the [Data Connect documentation](https
   - [*Connecting to the local Emulator*](#connecting-to-the-local-emulator)
 - [**Queries**](#queries)
   - [*GetUserByUid*](#getuserbyuid)
+  - [*SearchLegalChunks*](#searchlegalchunks)
+  - [*SearchLegalChunksByLaw*](#searchlegalchunksbylaw)
+  - [*ListLegalChunksByLaw*](#listlegalchunksbylaw)
 - [**Mutations**](#mutations)
   - [*CreateUser*](#createuser)
   - [*UpsertUserProfile*](#upsertuserprofile)
@@ -25,6 +28,7 @@ You can also follow the instructions from the [Data Connect documentation](https
   - [*CreateUserQuery*](#createuserquery)
   - [*CreateAppointment*](#createappointment)
   - [*CreateAppointmentWithCenter*](#createappointmentwithcenter)
+  - [*CreateLegalChunk*](#createlegalchunk)
 
 # TanStack Query Firebase & TanStack React Query
 This SDK provides [React](https://react.dev/) hooks generated specific to your application, for the operations found in the connector `example`. These hooks are generated using [TanStack Query Firebase](https://react-query-firebase.invertase.dev/) by our partners at Invertase, a library built on top of [TanStack React Query v5](https://tanstack.com/query/v5/docs/framework/react/overview).
@@ -199,6 +203,293 @@ export default function GetUserByUidComponent() {
   // If the Query is successful, you can access the data returned using the `UseQueryResult.data` field.
   if (query.isSuccess) {
     console.log(query.data.users);
+  }
+  return <div>Query execution {query.isSuccess ? 'successful' : 'failed'}!</div>;
+}
+```
+
+## SearchLegalChunks
+You can execute the `SearchLegalChunks` Query using the following Query hook function, which is defined in [dataconnect-generated/react/index.d.ts](./index.d.ts):
+
+```javascript
+useSearchLegalChunks(dc: DataConnect, vars: SearchLegalChunksVariables, options?: useDataConnectQueryOptions<SearchLegalChunksData>): UseDataConnectQueryResult<SearchLegalChunksData, SearchLegalChunksVariables>;
+```
+You can also pass in a `DataConnect` instance to the Query hook function.
+```javascript
+useSearchLegalChunks(vars: SearchLegalChunksVariables, options?: useDataConnectQueryOptions<SearchLegalChunksData>): UseDataConnectQueryResult<SearchLegalChunksData, SearchLegalChunksVariables>;
+```
+
+### Variables
+The `SearchLegalChunks` Query requires an argument of type `SearchLegalChunksVariables`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+
+```javascript
+export interface SearchLegalChunksVariables {
+  term: string;
+  limit: number;
+}
+```
+### Return Type
+Recall that calling the `SearchLegalChunks` Query hook function returns a `UseQueryResult` object. This object holds the state of your Query, including whether the Query is loading, has completed, or has succeeded/failed, and any data returned by the Query, among other things.
+
+To check the status of a Query, use the `UseQueryResult.status` field. You can also check for pending / success / error status using the `UseQueryResult.isPending`, `UseQueryResult.isSuccess`, and `UseQueryResult.isError` fields.
+
+To access the data returned by a Query, use the `UseQueryResult.data` field. The data for the `SearchLegalChunks` Query is of type `SearchLegalChunksData`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+```javascript
+export interface SearchLegalChunksData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+```
+
+To learn more about the `UseQueryResult` object, see the [TanStack React Query documentation](https://tanstack.com/query/v5/docs/framework/react/reference/useQuery).
+
+### Using `SearchLegalChunks`'s Query hook function
+
+```javascript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, SearchLegalChunksVariables } from '@dataconnect/my-app';
+import { useSearchLegalChunks } from '@dataconnect/my-app/react'
+
+export default function SearchLegalChunksComponent() {
+  // The `useSearchLegalChunks` Query hook requires an argument of type `SearchLegalChunksVariables`:
+  const searchLegalChunksVars: SearchLegalChunksVariables = {
+    term: ..., 
+    limit: ..., 
+  };
+
+  // You don't have to do anything to "execute" the Query.
+  // Call the Query hook function to get a `UseQueryResult` object which holds the state of your Query.
+  const query = useSearchLegalChunks(searchLegalChunksVars);
+  // Variables can be defined inline as well.
+  const query = useSearchLegalChunks({ term: ..., limit: ..., });
+
+  // You can also pass in a `DataConnect` instance to the Query hook function.
+  const dataConnect = getDataConnect(connectorConfig);
+  const query = useSearchLegalChunks(dataConnect, searchLegalChunksVars);
+
+  // You can also pass in a `useDataConnectQueryOptions` object to the Query hook function.
+  const options = { staleTime: 5 * 1000 };
+  const query = useSearchLegalChunks(searchLegalChunksVars, options);
+
+  // You can also pass both a `DataConnect` instance and a `useDataConnectQueryOptions` object.
+  const dataConnect = getDataConnect(connectorConfig);
+  const options = { staleTime: 5 * 1000 };
+  const query = useSearchLegalChunks(dataConnect, searchLegalChunksVars, options);
+
+  // Then, you can render your component dynamically based on the status of the Query.
+  if (query.isPending) {
+    return <div>Loading...</div>;
+  }
+
+  if (query.isError) {
+    return <div>Error: {query.error.message}</div>;
+  }
+
+  // If the Query is successful, you can access the data returned using the `UseQueryResult.data` field.
+  if (query.isSuccess) {
+    console.log(query.data.legalChunks);
+  }
+  return <div>Query execution {query.isSuccess ? 'successful' : 'failed'}!</div>;
+}
+```
+
+## SearchLegalChunksByLaw
+You can execute the `SearchLegalChunksByLaw` Query using the following Query hook function, which is defined in [dataconnect-generated/react/index.d.ts](./index.d.ts):
+
+```javascript
+useSearchLegalChunksByLaw(dc: DataConnect, vars: SearchLegalChunksByLawVariables, options?: useDataConnectQueryOptions<SearchLegalChunksByLawData>): UseDataConnectQueryResult<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+```
+You can also pass in a `DataConnect` instance to the Query hook function.
+```javascript
+useSearchLegalChunksByLaw(vars: SearchLegalChunksByLawVariables, options?: useDataConnectQueryOptions<SearchLegalChunksByLawData>): UseDataConnectQueryResult<SearchLegalChunksByLawData, SearchLegalChunksByLawVariables>;
+```
+
+### Variables
+The `SearchLegalChunksByLaw` Query requires an argument of type `SearchLegalChunksByLawVariables`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+
+```javascript
+export interface SearchLegalChunksByLawVariables {
+  lawName: string;
+  term: string;
+  limit: number;
+}
+```
+### Return Type
+Recall that calling the `SearchLegalChunksByLaw` Query hook function returns a `UseQueryResult` object. This object holds the state of your Query, including whether the Query is loading, has completed, or has succeeded/failed, and any data returned by the Query, among other things.
+
+To check the status of a Query, use the `UseQueryResult.status` field. You can also check for pending / success / error status using the `UseQueryResult.isPending`, `UseQueryResult.isSuccess`, and `UseQueryResult.isError` fields.
+
+To access the data returned by a Query, use the `UseQueryResult.data` field. The data for the `SearchLegalChunksByLaw` Query is of type `SearchLegalChunksByLawData`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+```javascript
+export interface SearchLegalChunksByLawData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+```
+
+To learn more about the `UseQueryResult` object, see the [TanStack React Query documentation](https://tanstack.com/query/v5/docs/framework/react/reference/useQuery).
+
+### Using `SearchLegalChunksByLaw`'s Query hook function
+
+```javascript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, SearchLegalChunksByLawVariables } from '@dataconnect/my-app';
+import { useSearchLegalChunksByLaw } from '@dataconnect/my-app/react'
+
+export default function SearchLegalChunksByLawComponent() {
+  // The `useSearchLegalChunksByLaw` Query hook requires an argument of type `SearchLegalChunksByLawVariables`:
+  const searchLegalChunksByLawVars: SearchLegalChunksByLawVariables = {
+    lawName: ..., 
+    term: ..., 
+    limit: ..., 
+  };
+
+  // You don't have to do anything to "execute" the Query.
+  // Call the Query hook function to get a `UseQueryResult` object which holds the state of your Query.
+  const query = useSearchLegalChunksByLaw(searchLegalChunksByLawVars);
+  // Variables can be defined inline as well.
+  const query = useSearchLegalChunksByLaw({ lawName: ..., term: ..., limit: ..., });
+
+  // You can also pass in a `DataConnect` instance to the Query hook function.
+  const dataConnect = getDataConnect(connectorConfig);
+  const query = useSearchLegalChunksByLaw(dataConnect, searchLegalChunksByLawVars);
+
+  // You can also pass in a `useDataConnectQueryOptions` object to the Query hook function.
+  const options = { staleTime: 5 * 1000 };
+  const query = useSearchLegalChunksByLaw(searchLegalChunksByLawVars, options);
+
+  // You can also pass both a `DataConnect` instance and a `useDataConnectQueryOptions` object.
+  const dataConnect = getDataConnect(connectorConfig);
+  const options = { staleTime: 5 * 1000 };
+  const query = useSearchLegalChunksByLaw(dataConnect, searchLegalChunksByLawVars, options);
+
+  // Then, you can render your component dynamically based on the status of the Query.
+  if (query.isPending) {
+    return <div>Loading...</div>;
+  }
+
+  if (query.isError) {
+    return <div>Error: {query.error.message}</div>;
+  }
+
+  // If the Query is successful, you can access the data returned using the `UseQueryResult.data` field.
+  if (query.isSuccess) {
+    console.log(query.data.legalChunks);
+  }
+  return <div>Query execution {query.isSuccess ? 'successful' : 'failed'}!</div>;
+}
+```
+
+## ListLegalChunksByLaw
+You can execute the `ListLegalChunksByLaw` Query using the following Query hook function, which is defined in [dataconnect-generated/react/index.d.ts](./index.d.ts):
+
+```javascript
+useListLegalChunksByLaw(dc: DataConnect, vars: ListLegalChunksByLawVariables, options?: useDataConnectQueryOptions<ListLegalChunksByLawData>): UseDataConnectQueryResult<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+```
+You can also pass in a `DataConnect` instance to the Query hook function.
+```javascript
+useListLegalChunksByLaw(vars: ListLegalChunksByLawVariables, options?: useDataConnectQueryOptions<ListLegalChunksByLawData>): UseDataConnectQueryResult<ListLegalChunksByLawData, ListLegalChunksByLawVariables>;
+```
+
+### Variables
+The `ListLegalChunksByLaw` Query requires an argument of type `ListLegalChunksByLawVariables`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+
+```javascript
+export interface ListLegalChunksByLawVariables {
+  lawName: string;
+  limit: number;
+}
+```
+### Return Type
+Recall that calling the `ListLegalChunksByLaw` Query hook function returns a `UseQueryResult` object. This object holds the state of your Query, including whether the Query is loading, has completed, or has succeeded/failed, and any data returned by the Query, among other things.
+
+To check the status of a Query, use the `UseQueryResult.status` field. You can also check for pending / success / error status using the `UseQueryResult.isPending`, `UseQueryResult.isSuccess`, and `UseQueryResult.isError` fields.
+
+To access the data returned by a Query, use the `UseQueryResult.data` field. The data for the `ListLegalChunksByLaw` Query is of type `ListLegalChunksByLawData`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+```javascript
+export interface ListLegalChunksByLawData {
+  legalChunks: ({
+    id: UUIDString;
+    lawName: string;
+    sourceUrl?: string | null;
+    sourceFile?: string | null;
+    page?: number | null;
+    chunkIndex: number;
+    text: string;
+    tokens: string[];
+    embeddingJson?: string | null;
+    createdAt: TimestampString;
+  } & LegalChunk_Key)[];
+}
+```
+
+To learn more about the `UseQueryResult` object, see the [TanStack React Query documentation](https://tanstack.com/query/v5/docs/framework/react/reference/useQuery).
+
+### Using `ListLegalChunksByLaw`'s Query hook function
+
+```javascript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, ListLegalChunksByLawVariables } from '@dataconnect/my-app';
+import { useListLegalChunksByLaw } from '@dataconnect/my-app/react'
+
+export default function ListLegalChunksByLawComponent() {
+  // The `useListLegalChunksByLaw` Query hook requires an argument of type `ListLegalChunksByLawVariables`:
+  const listLegalChunksByLawVars: ListLegalChunksByLawVariables = {
+    lawName: ..., 
+    limit: ..., 
+  };
+
+  // You don't have to do anything to "execute" the Query.
+  // Call the Query hook function to get a `UseQueryResult` object which holds the state of your Query.
+  const query = useListLegalChunksByLaw(listLegalChunksByLawVars);
+  // Variables can be defined inline as well.
+  const query = useListLegalChunksByLaw({ lawName: ..., limit: ..., });
+
+  // You can also pass in a `DataConnect` instance to the Query hook function.
+  const dataConnect = getDataConnect(connectorConfig);
+  const query = useListLegalChunksByLaw(dataConnect, listLegalChunksByLawVars);
+
+  // You can also pass in a `useDataConnectQueryOptions` object to the Query hook function.
+  const options = { staleTime: 5 * 1000 };
+  const query = useListLegalChunksByLaw(listLegalChunksByLawVars, options);
+
+  // You can also pass both a `DataConnect` instance and a `useDataConnectQueryOptions` object.
+  const dataConnect = getDataConnect(connectorConfig);
+  const options = { staleTime: 5 * 1000 };
+  const query = useListLegalChunksByLaw(dataConnect, listLegalChunksByLawVars, options);
+
+  // Then, you can render your component dynamically based on the status of the Query.
+  if (query.isPending) {
+    return <div>Loading...</div>;
+  }
+
+  if (query.isError) {
+    return <div>Error: {query.error.message}</div>;
+  }
+
+  // If the Query is successful, you can access the data returned using the `UseQueryResult.data` field.
+  if (query.isSuccess) {
+    console.log(query.data.legalChunks);
   }
   return <div>Query execution {query.isSuccess ? 'successful' : 'failed'}!</div>;
 }
@@ -566,6 +857,9 @@ export interface CreateUserQueryVariables {
   isUrgent: boolean;
   isAnonymous: boolean;
   aiResponse?: string | null;
+  ragVerificationStatus?: string | null;
+  ragConfidence?: number | null;
+  ragCitationsJson?: string | null;
 }
 ```
 ### Return Type
@@ -625,10 +919,13 @@ export default function CreateUserQueryComponent() {
     isUrgent: ..., 
     isAnonymous: ..., 
     aiResponse: ..., // optional
+    ragVerificationStatus: ..., // optional
+    ragConfidence: ..., // optional
+    ragCitationsJson: ..., // optional
   };
   mutation.mutate(createUserQueryVars);
   // Variables can be defined inline as well.
-  mutation.mutate({ userId: ..., queryText: ..., detectedLanguage: ..., selectedResponseLanguage: ..., legalCategoryDetected: ..., intakeFollowUpQuestion: ..., intakeFollowUpAnswer: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., });
+  mutation.mutate({ userId: ..., queryText: ..., detectedLanguage: ..., selectedResponseLanguage: ..., legalCategoryDetected: ..., intakeFollowUpQuestion: ..., intakeFollowUpAnswer: ..., isUrgent: ..., isAnonymous: ..., aiResponse: ..., ragVerificationStatus: ..., ragConfidence: ..., ragCitationsJson: ..., });
 
   // You can also pass in a `useDataConnectMutationOptions` object to `UseMutationResult.mutate()`.
   const options = {
@@ -858,6 +1155,114 @@ export default function CreateAppointmentWithCenterComponent() {
   // If the Mutation is successful, you can access the data returned using the `UseMutationResult.data` field.
   if (mutation.isSuccess) {
     console.log(mutation.data.appointment_insert);
+  }
+  return <div>Mutation execution {mutation.isSuccess ? 'successful' : 'failed'}!</div>;
+}
+```
+
+## CreateLegalChunk
+You can execute the `CreateLegalChunk` Mutation using the `UseMutationResult` object returned by the following Mutation hook function (which is defined in [dataconnect-generated/react/index.d.ts](./index.d.ts)):
+```javascript
+useCreateLegalChunk(options?: useDataConnectMutationOptions<CreateLegalChunkData, FirebaseError, CreateLegalChunkVariables>): UseDataConnectMutationResult<CreateLegalChunkData, CreateLegalChunkVariables>;
+```
+You can also pass in a `DataConnect` instance to the Mutation hook function.
+```javascript
+useCreateLegalChunk(dc: DataConnect, options?: useDataConnectMutationOptions<CreateLegalChunkData, FirebaseError, CreateLegalChunkVariables>): UseDataConnectMutationResult<CreateLegalChunkData, CreateLegalChunkVariables>;
+```
+
+### Variables
+The `CreateLegalChunk` Mutation requires an argument of type `CreateLegalChunkVariables`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+
+```javascript
+export interface CreateLegalChunkVariables {
+  lawName: string;
+  sourceUrl?: string | null;
+  sourceFile?: string | null;
+  page?: number | null;
+  chunkIndex: number;
+  text: string;
+  tokens: string[];
+  embeddingJson?: string | null;
+}
+```
+### Return Type
+Recall that calling the `CreateLegalChunk` Mutation hook function returns a `UseMutationResult` object. This object holds the state of your Mutation, including whether the Mutation is loading, has completed, or has succeeded/failed, among other things.
+
+To check the status of a Mutation, use the `UseMutationResult.status` field. You can also check for pending / success / error status using the `UseMutationResult.isPending`, `UseMutationResult.isSuccess`, and `UseMutationResult.isError` fields.
+
+To execute the Mutation, call `UseMutationResult.mutate()`. This function executes the Mutation, but does not return the data from the Mutation.
+
+To access the data returned by a Mutation, use the `UseMutationResult.data` field. The data for the `CreateLegalChunk` Mutation is of type `CreateLegalChunkData`, which is defined in [dataconnect-generated/index.d.ts](../index.d.ts). It has the following fields:
+```javascript
+export interface CreateLegalChunkData {
+  legalChunk_insert: LegalChunk_Key;
+}
+```
+
+To learn more about the `UseMutationResult` object, see the [TanStack React Query documentation](https://tanstack.com/query/v5/docs/framework/react/reference/useMutation).
+
+### Using `CreateLegalChunk`'s Mutation hook function
+
+```javascript
+import { getDataConnect } from 'firebase/data-connect';
+import { connectorConfig, CreateLegalChunkVariables } from '@dataconnect/my-app';
+import { useCreateLegalChunk } from '@dataconnect/my-app/react'
+
+export default function CreateLegalChunkComponent() {
+  // Call the Mutation hook function to get a `UseMutationResult` object which holds the state of your Mutation.
+  const mutation = useCreateLegalChunk();
+
+  // You can also pass in a `DataConnect` instance to the Mutation hook function.
+  const dataConnect = getDataConnect(connectorConfig);
+  const mutation = useCreateLegalChunk(dataConnect);
+
+  // You can also pass in a `useDataConnectMutationOptions` object to the Mutation hook function.
+  const options = {
+    onSuccess: () => { console.log('Mutation succeeded!'); }
+  };
+  const mutation = useCreateLegalChunk(options);
+
+  // You can also pass both a `DataConnect` instance and a `useDataConnectMutationOptions` object.
+  const dataConnect = getDataConnect(connectorConfig);
+  const options = {
+    onSuccess: () => { console.log('Mutation succeeded!'); }
+  };
+  const mutation = useCreateLegalChunk(dataConnect, options);
+
+  // After calling the Mutation hook function, you must call `UseMutationResult.mutate()` to execute the Mutation.
+  // The `useCreateLegalChunk` Mutation requires an argument of type `CreateLegalChunkVariables`:
+  const createLegalChunkVars: CreateLegalChunkVariables = {
+    lawName: ..., 
+    sourceUrl: ..., // optional
+    sourceFile: ..., // optional
+    page: ..., // optional
+    chunkIndex: ..., 
+    text: ..., 
+    tokens: ..., 
+    embeddingJson: ..., // optional
+  };
+  mutation.mutate(createLegalChunkVars);
+  // Variables can be defined inline as well.
+  mutation.mutate({ lawName: ..., sourceUrl: ..., sourceFile: ..., page: ..., chunkIndex: ..., text: ..., tokens: ..., embeddingJson: ..., });
+
+  // You can also pass in a `useDataConnectMutationOptions` object to `UseMutationResult.mutate()`.
+  const options = {
+    onSuccess: () => { console.log('Mutation succeeded!'); }
+  };
+  mutation.mutate(createLegalChunkVars, options);
+
+  // Then, you can render your component dynamically based on the status of the Mutation.
+  if (mutation.isPending) {
+    return <div>Loading...</div>;
+  }
+
+  if (mutation.isError) {
+    return <div>Error: {mutation.error.message}</div>;
+  }
+
+  // If the Mutation is successful, you can access the data returned using the `UseMutationResult.data` field.
+  if (mutation.isSuccess) {
+    console.log(mutation.data.legalChunk_insert);
   }
   return <div>Mutation execution {mutation.isSuccess ? 'successful' : 'failed'}!</div>;
 }

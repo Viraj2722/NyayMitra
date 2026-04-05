@@ -86,18 +86,32 @@ const INTAKE_FLOW: Record<
   },
 };
 
-const LOCALIZED_FALLBACK_RESPONSE: Record<AppLanguage, (category: string) => string> = {
-  English: (category) => `I understood your issue and prepared guidance for ${category}.`,
-  Hindi: (category) => `मैंने आपकी समस्या समझ ली है और ${category} के लिए मार्गदर्शन तैयार किया है।`,
-  Marathi: (category) => `मी तुमची समस्या समजून घेतली आहे आणि ${category} साठी मार्गदर्शन तयार केले आहे.`,
-  Bengali: (category) => `আমি আপনার সমস্যা বুঝেছি এবং ${category} এর জন্য নির্দেশনা প্রস্তুত করেছি।`,
-  Gujarati: (category) => `મેં તમારી સમસ્યા સમજી લીધી છે અને ${category} માટે માર્ગદર્શન તૈયાર કર્યું છે.`,
-  Tamil: (category) => `நான் உங்கள் பிரச்சினையைப் புரிந்துகொண்டேன், ${category} க்கான வழிகாட்டுதலைத் தயார் செய்துள்ளேன்.`,
-  Telugu: (category) => `నేను మీ సమస్యను అర్థం చేసుకున్నాను మరియు ${category} కోసం మార్గదర్శకాన్ని సిద్ధం చేశాను.`,
-  Kannada: (category) => `ನಾನು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ಅರ್ಥಮಾಡಿಕೊಂಡಿದ್ದೇನೆ ಮತ್ತು ${category}ಗಾಗಿ ಮಾರ್ಗದರ್ಶನವನ್ನು ತಯಾರಿಸಿದ್ದೇನೆ.`,
-  Malayalam: (category) => `ഞാൻ നിങ്ങളുടെ പ്രശ്നം മനസ്സിലാക്കി, ${category}യ്ക്കായി മാർഗനിർദേശം തയ്യാറാക്കി.`,
-  Punjabi: (category) => `ਮੈਂ ਤੁਹਾਡੀ ਸਮੱਸਿਆ ਸਮਝ ਲਈ ਹੈ ਅਤੇ ${category} ਲਈ ਮਾਰਗਦਰਸ਼ਨ ਤਿਆਰ ਕੀਤਾ ਹੈ।`,
-  Urdu: (category) => `میں نے آپ کا مسئلہ سمجھ لیا ہے اور ${category} کے لیے رہنمائی تیار کی ہے۔`,
+const LOCALIZED_FALLBACK_RESPONSE: Record<
+  AppLanguage,
+  (category: string) => string
+> = {
+  English: (category) =>
+    `I understood your issue and prepared guidance for ${category}.`,
+  Hindi: (category) =>
+    `मैंने आपकी समस्या समझ ली है और ${category} के लिए मार्गदर्शन तैयार किया है।`,
+  Marathi: (category) =>
+    `मी तुमची समस्या समजून घेतली आहे आणि ${category} साठी मार्गदर्शन तयार केले आहे.`,
+  Bengali: (category) =>
+    `আমি আপনার সমস্যা বুঝেছি এবং ${category} এর জন্য নির্দেশনা প্রস্তুত করেছি।`,
+  Gujarati: (category) =>
+    `મેં તમારી સમસ્યા સમજી લીધી છે અને ${category} માટે માર્ગદર્શન તૈયાર કર્યું છે.`,
+  Tamil: (category) =>
+    `நான் உங்கள் பிரச்சினையைப் புரிந்துகொண்டேன், ${category} க்கான வழிகாட்டுதலைத் தயார் செய்துள்ளேன்.`,
+  Telugu: (category) =>
+    `నేను మీ సమస్యను అర్థం చేసుకున్నాను మరియు ${category} కోసం మార్గదర్శకాన్ని సిద్ధం చేశాను.`,
+  Kannada: (category) =>
+    `ನಾನು ನಿಮ್ಮ ಸಮಸ್ಯೆಯನ್ನು ಅರ್ಥಮಾಡಿಕೊಂಡಿದ್ದೇನೆ ಮತ್ತು ${category}ಗಾಗಿ ಮಾರ್ಗದರ್ಶನವನ್ನು ತಯಾರಿಸಿದ್ದೇನೆ.`,
+  Malayalam: (category) =>
+    `ഞാൻ നിങ്ങളുടെ പ്രശ്നം മനസ്സിലാക്കി, ${category}യ്ക്കായി മാർഗനിർദേശം തയ്യാറാക്കി.`,
+  Punjabi: (category) =>
+    `ਮੈਂ ਤੁਹਾਡੀ ਸਮੱਸਿਆ ਸਮਝ ਲਈ ਹੈ ਅਤੇ ${category} ਲਈ ਮਾਰਗਦਰਸ਼ਨ ਤਿਆਰ ਕੀਤਾ ਹੈ।`,
+  Urdu: (category) =>
+    `میں نے آپ کا مسئلہ سمجھ لیا ہے اور ${category} کے لیے رہنمائی تیار کی ہے۔`,
 };
 
 const RESULTS_BUTTON_LABELS: Record<AppLanguage, string> = {
@@ -115,6 +129,25 @@ const RESULTS_BUTTON_LABELS: Record<AppLanguage, string> = {
 };
 
 const CHAT_SESSION_KEY = "nyaymitra_chat_session";
+
+const getBackendBaseCandidates = (): string[] => {
+  const candidates: string[] = [];
+  const envUrl = (process.env.NEXT_PUBLIC_BACKEND_URL || "").trim();
+  if (envUrl) {
+    candidates.push(envUrl.replace(/\/+$/, ""));
+  }
+
+  if (typeof window !== "undefined") {
+    const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+    const host = window.location.hostname;
+    if (host) {
+      candidates.push(`${protocol}//${host}:5000`);
+    }
+  }
+
+  candidates.push("http://localhost:5000", "http://127.0.0.1:5000");
+  return Array.from(new Set(candidates));
+};
 
 type ChatSessionState = {
   messages: Message[];
@@ -171,7 +204,11 @@ export default function ChatPage() {
       const storedSession = sessionStorage.getItem(CHAT_SESSION_KEY);
       if (storedSession) {
         const parsed = JSON.parse(storedSession) as Partial<ChatSessionState>;
-        if (parsed.selectedLanguage === selectedLanguage && Array.isArray(parsed.messages) && parsed.messages.length > 0) {
+        if (
+          parsed.selectedLanguage === selectedLanguage &&
+          Array.isArray(parsed.messages) &&
+          parsed.messages.length > 0
+        ) {
           setMessages(parsed.messages);
           setSelectedCategory(parsed.selectedCategory ?? null);
           setFollowUpAnswer(parsed.followUpAnswer ?? null);
@@ -269,7 +306,13 @@ export default function ChatPage() {
     };
 
     sessionStorage.setItem(CHAT_SESSION_KEY, JSON.stringify(sessionState));
-  }, [messages, selectedCategory, followUpAnswer, selectedLanguage, hasInitializedSession]);
+  }, [
+    messages,
+    selectedCategory,
+    followUpAnswer,
+    selectedLanguage,
+    hasInitializedSession,
+  ]);
 
   const speechLang = useMemo(() => {
     if (!selectedLanguage) return "en-IN";
@@ -357,31 +400,48 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const BACKEND_BASE_URL =
-        process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5000";
+      const backendCandidates = getBackendBaseCandidates();
+      let data: Record<string, unknown> | null = null;
+      let lastError: unknown = null;
 
-      const response = await fetch(`${BACKEND_BASE_URL}/api/query/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: currentInput,
-          lat: userLat,
-          lng: userLng,
-          isAnonymous: false,
-          userId: user.uid,
-          selectedLanguage,
-          intakeContext,
-        }),
-      });
+      for (const baseUrl of backendCandidates) {
+        try {
+          const response = await fetch(`${baseUrl}/api/query/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: currentInput,
+              lat: userLat,
+              lng: userLng,
+              isAnonymous: false,
+              userId: user.uid,
+              selectedLanguage,
+              intakeContext,
+            }),
+          });
 
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status}`);
+          if (!response.ok) {
+            throw new Error(`API Error ${response.status} from ${baseUrl}`);
+          }
+
+          data = (await response.json()) as Record<string, unknown>;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
       }
 
-      const data = await response.json();
+      if (!data) {
+        throw lastError || new Error("Unable to reach backend API");
+      }
+
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: data.response || LOCALIZED_FALLBACK_RESPONSE[selectedLanguage](data.category || "general"),
+        text:
+          String(data.response || "") ||
+          LOCALIZED_FALLBACK_RESPONSE[selectedLanguage](
+            String(data.category || "general"),
+          ),
         sender: "ai",
       };
 
@@ -389,7 +449,7 @@ export default function ChatPage() {
 
       localStorage.setItem(
         "nyaymitra_category",
-        data.category || intakeContext.category,
+        String(data.category || intakeContext.category),
       );
       localStorage.setItem(
         "nyaymitra_centers",
@@ -398,7 +458,7 @@ export default function ChatPage() {
       localStorage.setItem("nyaymitra_urgent", String(data.urgent || false));
       localStorage.setItem(
         "nyaymitra_detected_lang",
-        data.detected_language || selectedLanguage,
+        String(data.detected_language || selectedLanguage),
       );
       localStorage.setItem(
         "nyaymitra_rights",
@@ -414,21 +474,44 @@ export default function ChatPage() {
       );
       localStorage.setItem(
         "nyaymitra_map_search_query",
-        data.map_search_query || "",
+        String(data.map_search_query || ""),
+      );
+      localStorage.setItem(
+        "nyaymitra_citations",
+        JSON.stringify(data.citations || []),
       );
 
       try {
+        const citations = Array.isArray(data.citations) ? data.citations : [];
+        const ragVerificationStatus =
+          typeof data.verification_status === "string"
+            ? data.verification_status
+            : citations.length > 0
+              ? "verified"
+              : "not_verified";
+        const ragConfidence =
+          typeof data.verification_confidence === "number"
+            ? data.verification_confidence
+            : citations.length > 0
+              ? 0.7
+              : 0.2;
+
         await createUserQuery(dataConnect, {
           userId: profileId || null,
           queryText: currentInput,
-          detectedLanguage: data.detected_language || selectedLanguage,
+          detectedLanguage: String(data.detected_language || selectedLanguage),
           selectedResponseLanguage: selectedLanguage,
-          legalCategoryDetected: data.category || intakeContext.category,
+          legalCategoryDetected: String(
+            data.category || intakeContext.category,
+          ),
           intakeFollowUpQuestion: intakeContext.followUpQuestion,
           intakeFollowUpAnswer: intakeContext.followUpAnswer,
-          isUrgent: data.urgent || false,
+          isUrgent: Boolean(data.urgent),
           isAnonymous: false,
-          aiResponse: data.response,
+          aiResponse: String(data.response || ""),
+          ragVerificationStatus,
+          ragConfidence,
+          ragCitationsJson: JSON.stringify(citations),
         });
       } catch (dbError) {
         console.error("Failed to store in Data Connect:", dbError);
@@ -500,7 +583,9 @@ export default function ChatPage() {
   };
 
   const showResultsButton =
-    messages.length > 1 && messages[messages.length - 1]?.sender === "ai" && !isLoading;
+    messages.length > 1 &&
+    messages[messages.length - 1]?.sender === "ai" &&
+    !isLoading;
 
   if (loading || !user) {
     return (

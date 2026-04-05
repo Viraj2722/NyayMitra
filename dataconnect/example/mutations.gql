@@ -1,4 +1,10 @@
-mutation CreateUser($uid: String!, $name: String, $preferredLanguage: String, $mobile: String, $role: String @retired) @auth(level: PUBLIC) {
+mutation CreateUser(
+  $uid: String!
+  $name: String
+  $preferredLanguage: String
+  $mobile: String
+  $role: String @retired
+) @auth(level: PUBLIC) {
   user_insert(
     data: {
       uid: $uid
@@ -74,6 +80,9 @@ mutation CreateUserQuery(
   $isUrgent: Boolean!
   $isAnonymous: Boolean!
   $aiResponse: String
+  $ragVerificationStatus: String
+  $ragConfidence: Float
+  $ragCitationsJson: String
 ) @auth(level: PUBLIC) {
   userQuery_insert(
     data: {
@@ -87,6 +96,9 @@ mutation CreateUserQuery(
       isUrgent: $isUrgent
       isAnonymous: $isAnonymous
       aiResponse: $aiResponse
+      ragVerificationStatus: $ragVerificationStatus
+      ragConfidence: $ragConfidence
+      ragCitationsJson: $ragCitationsJson
     }
   )
 }
@@ -132,4 +144,89 @@ mutation CreateAppointmentWithCenter(
       status: $status
     }
   )
+}
+
+mutation CreateLegalChunk(
+  $lawName: String!
+  $sourceUrl: String
+  $sourceFile: String
+  $page: Int
+  $chunkIndex: Int!
+  $text: String!
+  $tokens: [String!]!
+  $embeddingJson: String
+) @auth(level: PUBLIC) {
+  legalChunk_insert(
+    data: {
+      lawName: $lawName
+      sourceUrl: $sourceUrl
+      sourceFile: $sourceFile
+      page: $page
+      chunkIndex: $chunkIndex
+      text: $text
+      tokens: $tokens
+      embeddingJson: $embeddingJson
+    }
+  )
+}
+
+query SearchLegalChunks($term: String!, $limit: Int!) @auth(level: PUBLIC) {
+  legalChunks(
+    where: { text: { contains: $term } }
+    orderBy: [{ createdAt: DESC }]
+    limit: $limit
+  ) {
+    id
+    lawName
+    sourceUrl
+    sourceFile
+    page
+    chunkIndex
+    text
+    tokens
+    embeddingJson
+    createdAt
+  }
+}
+
+query SearchLegalChunksByLaw($lawName: String!, $term: String!, $limit: Int!)
+@auth(level: PUBLIC) {
+  legalChunks(
+    where: {
+      _and: [{ lawName: { eq: $lawName } }, { text: { contains: $term } }]
+    }
+    orderBy: [{ chunkIndex: ASC }]
+    limit: $limit
+  ) {
+    id
+    lawName
+    sourceUrl
+    sourceFile
+    page
+    chunkIndex
+    text
+    tokens
+    embeddingJson
+    createdAt
+  }
+}
+
+query ListLegalChunksByLaw($lawName: String!, $limit: Int!)
+@auth(level: PUBLIC) {
+  legalChunks(
+    where: { lawName: { eq: $lawName } }
+    orderBy: [{ chunkIndex: ASC }]
+    limit: $limit
+  ) {
+    id
+    lawName
+    sourceUrl
+    sourceFile
+    page
+    chunkIndex
+    text
+    tokens
+    embeddingJson
+    createdAt
+  }
 }
