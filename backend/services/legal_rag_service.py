@@ -6,8 +6,7 @@ import tempfile
 from typing import Dict, List, Optional, Tuple
 
 import requests
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
+from pypdf import PdfReader
 
 
 # Official URLs for the new criminal laws and key legal references
@@ -90,6 +89,27 @@ def _simple_fallback_embedding(text: str, dim: int = 128) -> List[float]:
     return vector
 
 
+def _chunk_text(text: str, chunk_size: int = 1200, overlap: int = 80) -> List[str]:
+    cleaned = " ".join((text or "").split())
+    if not cleaned:
+        return []
+
+    chunks: List[str] = []
+    start = 0
+    text_length = len(cleaned)
+
+    while start < text_length:
+        end = min(start + chunk_size, text_length)
+        chunk = cleaned[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        if end >= text_length:
+            break
+        start = max(end - overlap, start + 1)
+
+    return chunks
+
+
 def _embed_text(text: str) -> List[float]:
     return _simple_fallback_embedding(text)
 
@@ -149,12 +169,6 @@ def ingest_legal_data(force_download: bool = False) -> Dict[str, int]:
             return {"total_chunks": int(items)}
 
     all_chunks: List[Dict] = []
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1200,
-        chunk_overlap=80,
-        separators=["\nSection ", "\nArticle ", "\nChapter ", "\n\n", "\n", " "],
-    )
-
     for law_name, url in LATEST_INDIAN_LAWS.items():
         file_path = os.path.join(KB_DIR, f"{law_name}.pdf")
         if force_download or not os.path.exists(file_path) or not _is_valid_pdf(file_path):
@@ -170,32 +184,28 @@ def ingest_legal_data(force_download: bool = False) -> Dict[str, int]:
                 continue
 
         try:
-            loader = PyPDFLoader(file_path)
-            documents = loader.load()
-            chunks = text_splitter.split_documents(documents)
+            reader = PdfReader(file_path)
+            for page_index, page in enumerate(reader.pages, start=1):
+                raw_text = page.extract_text() or ""
+                for chunk_index, text in enumerate(_chunk_text(raw_text), start=1):
+                    if not text:
+                        continue
 
-            for chunk in chunks:
-                text = (chunk.page_content or "").strip()
-                if not text:
-                    continue
+                    embedding = _embed_text(text)
 
-                metadata = chunk.metadata or {}
-                page = metadata.get("page")
-                source = metadata.get("source", file_path)
-                embedding = _embed_text(text)
-
-                all_chunks.append(
-                    {
-                        "text": text,
-                        "metadata": {
-                            "law_name": law_name,
-                            "source_url": url,
-                            "source_file": source,
-                            "page": page,
-                        },
-                        "embedding": embedding,
-                    }
-                )
+                    all_chunks.append(
+                        {
+                            "text": text,
+                            "metadata": {
+                                "law_name": law_name,
+                                "source_url": url,
+                                "source_file": file_path,
+                                "page": page_index,
+                                "chunk": chunk_index,
+                            },
+                            "embedding": embedding,
+                        }
+                    )
         except Exception as parse_error:
             print(f"Skipping {law_name}: PDF parse failed ({parse_error})")
             continue
