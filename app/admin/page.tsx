@@ -323,7 +323,7 @@ export default function AdminPage() {
       appointmentsQuery,
       (snapshot) => {
         const appointmentRows = snapshot.docs
-          .map((doc) => {
+          .map((doc): AppointmentRow | null => {
             const data = doc.data();
             if (String(data.status || "pending").toLowerCase() === "cancelled") {
               return null;
