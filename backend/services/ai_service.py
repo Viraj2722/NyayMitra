@@ -6,15 +6,14 @@ from dotenv import load_dotenv
 env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', '.env')
 load_dotenv(env_path)
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from services.legal_rag_service import retrieve_legal_context
 
 # Configure Gemini
 api_key = os.getenv("GEMINI_API_KEY")
-if api_key:
-    genai.configure(api_key=api_key)
-
-model = genai.GenerativeModel("gemini-2.5-flash")
+client = genai.Client(api_key=api_key) if api_key else None
+model_name = "gemini-2.5-flash"
 
 JARGON_MAP = {
     "injunction": "court order to stop something",
@@ -297,11 +296,15 @@ def _generate_response_payload(user_input, selected_language="English", intake_c
         f"User message: {user_input}"
     )
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(response_mime_type="application/json")
+        if not client:
+            raise RuntimeError("Gemini client is not configured")
+
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-        data = json.loads(response.text)
+        data = json.loads(response.text or "{}")
 
         category = _normalized_category(data.get("category"))
         fallback = DEFAULT_BY_CATEGORY.get(category, DEFAULT_BY_CATEGORY["general"])
@@ -348,7 +351,11 @@ def generate_response(user_input):
 def classify_category(text):
     prompt = f"Classify this legal issue into one of these exact categories: labor, domestic violence, tenancy, consumer, family, land dispute, harassment, or general. If unsure, output 'general'. Text: {text}"
     try:
-        category = model.generate_content(prompt).text.strip().lower()
+        if not client:
+            raise RuntimeError("Gemini client is not configured")
+
+        category_response = client.models.generate_content(model=model_name, contents=prompt)
+        category = (category_response.text or "").strip().lower()
         return category
     except Exception:
         return "general"
